@@ -1,0 +1,75 @@
+{
+  "pages": [
+    {
+      "path": "pages/auth/login",
+      "style": { "navigationBarTitleText": "登录" }
+    },
+    {
+      "path": "pages/auth/phone-bind",
+      "style": { "navigationBarTitleText": "绑定手机号" }
+    },
+    {
+      "path": "pages/role-redirect/index",
+      "style": { "navigationBarTitleText": "" }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "subpkg-franchisee",
+      "pages": [
+        { "path": "dashboard/index", "style": { "navigationBarTitleText": "工作台" } },
+        { "path": "order/list", "style": { "navigationBarTitleText": "订单列表" } },
+        { "path": "order/detail", "style": { "navigationBarTitleText": "订单详情" } },
+        { "path": "order/create", "style": { "navigationBarTitleText": "订货下单" } },
+        { "path": "order/cart", "style": { "navigationBarTitleText": "购物车" } },
+        { "path": "goods/category", "style": { "navigationBarTitleText": "商品分类" } },
+        { "path": "goods/list", "style": { "navigationBarTitleText": "商品列表" } },
+        { "path": "goods/detail", "style": { "navigationBarTitleText": "商品详情" } },
+        { "path": "goods/search", "style": { "navigationBarTitleText": "搜索" } },
+        { "path": "payment/account", "style": { "navigationBarTitleText": "账户余额" } },
+        { "path": "payment/bill-list", "style": { "navigationBarTitleText": "账单" } },
+        { "path": "payment/recharge", "style": { "navigationBarTitleText": "充值" } },
+        { "path": "store/profile", "style": { "navigationBarTitleText": "门店信息" } },
+        { "path": "store/certification", "style": { "navigationBarTitleText": "资质认证" } },
+        { "path": "report/sales", "style": { "navigationBarTitleText": "销售报表" } },
+        { "path": "msg-center/index", "style": { "navigationBarTitleText": "消息中心" } },
+        { "path": "settings/account", "style": { "navigationBarTitleText": "账号安全" } }
+      ]
+    },
+    {
+      "root": "subpkg-prospect",
+      "pages": [
+        { "path": "brand/list", "style": { "navigationBarTitleText": "品牌列表" } },
+        { "path": "brand/detail", "style": { "navigationBarTitleText": "品牌详情" } },
+        { "path": "application/guide", "style": { "navigationBarTitleText": "加盟指南" } },
+        { "path": "application/form", "style": { "navigationBarTitleText": "加盟申请" } },
+        { "path": "application/progress", "style": { "navigationBarTitleText": "申请进度" } },
+        { "path": "application/upload", "style": { "navigationBarTitleText": "资料上传" } },
+        { "path": "calculator/roi", "style": { "navigationBarTitleText": "投资测算" } },
+        { "path": "contact/index", "style": { "navigationBarTitleText": "联系我们" } }
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/auth/login": {
+      "network": "all",
+      "packages": ["subpkg-common"]
+    },
+    "pages/role-redirect/index": {
+      "network": "all",
+      "packages": ["subpkg-franchisee", "subpkg-prospect"]
+    }
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "核销食",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F5F5F5"
+  },
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^u-(.*)": "@/components/u-$1/u-$1.vue"
+    }
+  }
+}

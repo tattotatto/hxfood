@@ -1,0 +1,183 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { SkuVo } from '@hxfood/shared-types';
+
+@Injectable()
+export class ProductService {
+  constructor(private prisma: PrismaService) {}
+
+  // ── 分类 ──
+  async getCategories(brandId: string) {
+    return this.prisma.category.findMany({
+      where: { brandId },
+      orderBy: { sortOrder: 'asc' },
+      include: { children: true },
+    });
+  }
+
+  async createCategory(
+    brandId: string,
+    dto: { name: string; parentId?: string; sortOrder?: number },
+  ) {
+    // path 是 Unsupported("ltree")，Prisma 不生成类型，需通过 raw SQL 读写
+    let path: string;
+    if (dto.parentId) {
+      const rows = await this.prisma.$queryRawUnsafe<Array<{ path: string }>>(
+        `SELECT "path"::text as "path" FROM categories WHERE id = $1`,
+        dto.parentId,
+      );
+      path = rows[0]?.path ? rows[0].path + '.' + dto.name : dto.name;
+    } else {
+      path = dto.name;
+    }
+
+    const category = await this.prisma.category.create({
+      data: {
+        brandId,
+        name: dto.name,
+        parentId: dto.parentId,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+
+    // ltree 字段必须用 raw SQL 写入
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE categories SET "path" = $1::ltree WHERE id = $2`,
+      path,
+      category.id,
+    );
+
+    return { ...category, path };
+  }
+
+  // ── SPU ──
+  async getSpus(brandId: string, categoryId?: string) {
+    return this.prisma.spu.findMany({
+      where: {
+        brandId,
+        isActive: true,
+        ...(categoryId ? { categoryId } : {}),
+      },
+      include: { category: true, skus: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createSpu(
+    brandId: string,
+    dto: {
+      categoryId?: string;
+      name: string;
+      spuCode: string;
+      unit?: string;
+      spec?: string;
+      storageType?: string;
+      shelfLifeDays?: number;
+      images?: string[];
+    },
+  ) {
+    return this.prisma.spu.create({
+      data: {
+        brandId,
+        ...dto,
+        storageType: (dto.storageType as any) || 'ambient',
+      } as any,
+    });
+  }
+
+  // ── SKU ──
+  async getSkus(brandId: string, storeId: string): Promise<SkuVo[]> {
+    // 加盟店查商品：带价格解析 + 库存
+    const skus = await this.prisma.sku.findMany({
+      where: { brandId, isActive: true },
+      include: {
+        spu: true,
+        pricePolicies: true,
+        inventories: { where: { status: 'normal' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return skus.map((sku) => {
+      const effectivePrice = this.resolvePrice(
+        sku.pricePolicies,
+        storeId,
+        sku.price,
+      );
+      const totalAvailable = sku.inventories.reduce(
+        (sum: number, inv) => sum + (inv.quantity - inv.lockedQty),
+        0,
+      );
+      return {
+        id: sku.id,
+        skuCode: sku.skuCode,
+        name: sku.spu.name,
+        specDetail: sku.specDetail || '',
+        price: effectivePrice / 100, // 分→元
+        stockAvailable: totalAvailable,
+        minOrderQty: sku.minOrderQty,
+        stepOrderQty: sku.stepOrderQty,
+        images: (sku.spu.images as string[]) || [],
+      };
+    });
+  }
+
+  async getSkuById(brandId: string, skuId: string, storeId: string) {
+    const sku = await this.prisma.sku.findUnique({
+      where: { id: skuId, brandId },
+      include: {
+        spu: true,
+        pricePolicies: true,
+        inventories: { where: { status: 'normal' } },
+      },
+    });
+    if (!sku) throw new Error('SKU not found');
+    const price = this.resolvePrice(sku.pricePolicies, storeId, sku.price);
+    const stock = sku.inventories.reduce(
+      (s: number, i) => s + (i.quantity - i.lockedQty),
+      0,
+    );
+    return { ...sku, effectivePrice: price, stockAvailable: stock };
+  }
+
+  /** 价格解析：合同价 > 活动价 > 等级价 > 基准价 */
+  private resolvePrice(
+    policies: any[],
+    _storeId: string,
+    basePrice: number,
+  ): number {
+    const now = new Date();
+    const active = policies.filter(
+      (p) =>
+        (!p.startAt || new Date(p.startAt) <= now) &&
+        (!p.endAt || new Date(p.endAt) >= now),
+    );
+    const priority = ['contract', 'promotion', 'store_level', 'default'];
+    for (const type of priority) {
+      const match = active.find((p) => p.policyType === type);
+      if (match) return match.price;
+    }
+    return basePrice;
+  }
+
+  // ── 价格策略 ──
+  async getPricePolicies(brandId: string, skuId: string) {
+    return this.prisma.pricePolicy.findMany({ where: { brandId, skuId } });
+  }
+
+  async createPricePolicy(
+    brandId: string,
+    dto: {
+      skuId: string;
+      policyType: string;
+      targetId?: string;
+      price: number;
+      startAt?: string;
+      endAt?: string;
+    },
+  ) {
+    return this.prisma.pricePolicy.create({
+      data: { brandId, ...dto } as any,
+    });
+  }
+}

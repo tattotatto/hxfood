@@ -1,0 +1,642 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [ltree(map: "ltree"), postgis(map: "postgis")]
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Enums
+//////////////////////////////////////////////////////////////////////////////
+
+enum OrgStatus {
+  active
+  inactive
+  suspended
+
+  @@map("org_status_enum")
+}
+
+enum OrgType {
+  headquarters
+  central_kitchen
+  franchise_store
+  supplier
+  warehouse
+
+  @@map("org_type_enum")
+}
+
+enum UserStatus {
+  active
+  disabled
+
+  @@map("user_status_enum")
+}
+
+enum StorageType {
+  ambient
+  refrigerated
+  frozen
+
+  @@map("storage_type_enum")
+}
+
+enum PricePolicyType {
+  default
+  store_level
+  promotion
+  contract
+
+  @@map("price_policy_type_enum")
+}
+
+enum OrderType {
+  purchase
+  sale
+  return
+  transfer
+
+  @@map("order_type_enum")
+}
+
+enum OrderStatus {
+  draft
+  pending_approval
+  approved
+  rejected
+  pending_production
+  in_production
+  partially_produced
+  produced
+  partially_shipped
+  shipped
+  received
+  cancelled
+
+  @@map("order_status_enum")
+}
+
+enum PaymentMethod {
+  balance
+  wechat
+  credit
+  mixed
+
+  @@map("payment_method_enum")
+}
+
+enum ItemStatus {
+  normal
+  cancelled
+  short
+
+  @@map("item_status_enum")
+}
+
+enum ApprovalType {
+  submit
+  review
+  reject
+  cancel
+
+  @@map("approval_type_enum")
+}
+
+enum WarehouseType {
+  finished
+  raw_material
+  return
+  virtual
+
+  @@map("warehouse_type_enum")
+}
+
+enum InvStatus {
+  normal
+  quarantined
+  scrapped
+
+  @@map("inv_status_enum")
+}
+
+enum InvTransType {
+  purchase_in
+  production_in
+  return_in
+  sale_out
+  scrap_out
+  transfer_out
+  transfer_in
+  adjustment
+  lock
+  unlock
+  initial
+
+  @@map("inv_trans_type_enum")
+}
+
+enum InTransitStatus {
+  in_transit
+  received
+  partial_received
+
+  @@map("in_transit_status_enum")
+}
+
+enum AccountStatus {
+  normal
+  frozen
+  closed
+
+  @@map("account_status_enum")
+}
+
+enum TransType {
+  recharge
+  order_pay
+  refund
+  adjustment
+  credit_repay
+
+  @@map("trans_type_enum")
+}
+
+enum ReceivableStatus {
+  pending
+  partial
+  paid
+  overdue
+  written_off
+
+  @@map("receivable_status_enum")
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Models
+//////////////////////////////////////////////////////////////////////////////
+
+model Brand {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(100)
+  code      String    @unique @db.VarChar(20)
+  status    OrgStatus @default(active)
+  config    Json?     @db.JsonB
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  organizations         Organization[]
+  roles                 Role[]
+  categories            Category[]
+  spus                  Spu[]
+  skus                  Sku[]
+  pricePolicies         PricePolicy[]
+  orders                Order[]
+  orderItems            OrderItem[]
+  orderApprovals        OrderApproval[]
+  orderStatusLogs       OrderStatusLog[]
+  warehouses            Warehouse[]
+  inventories           Inventory[]
+  inventoryTransactions InventoryTransaction[]
+  inTransitInventories  InTransitInventory[]
+  storeAccounts         StoreAccount[]
+  accountTransactions   AccountTransaction[]
+  receivables           Receivable[]
+
+  @@map("brands")
+}
+
+model Organization {
+  id           String                           @id @default(uuid()) @db.Uuid
+  brandId      String                           @map("brand_id") @db.Uuid
+  parentId     String?                          @map("parent_id") @db.Uuid
+  orgType      OrgType                          @map("org_type")
+  name         String                           @db.VarChar(200)
+  code         String?                          @db.VarChar(50)
+  contactName  String?                          @map("contact_name") @db.VarChar(100)
+  contactPhone String?                          @map("contact_phone") @db.VarChar(20)
+  address      Json?                            @db.JsonB
+  location     Unsupported("geography(Point)")?
+  status       OrgStatus                        @default(active)
+  config       Json?                            @db.JsonB
+  createdAt    DateTime                         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime                         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand    Brand          @relation(fields: [brandId], references: [id])
+  parent   Organization?  @relation("OrgTree", fields: [parentId], references: [id])
+  children Organization[] @relation("OrgTree")
+
+  userOrgRoles        UserOrgRole[]
+  orders              Order[]
+  warehouseOrgs       Warehouse[]
+  storeAccount        StoreAccount?
+  accountTransactions AccountTransaction[]
+  receivables         Receivable[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  openid       String?    @db.VarChar(64)
+  unionid      String?    @db.VarChar(64)
+  username     String?    @db.VarChar(50)
+  passwordHash String?    @map("password_hash") @db.VarChar(255)
+  realName     String?    @map("real_name") @db.VarChar(50)
+  phone        String?    @db.VarChar(20)
+  avatar       String?    @db.VarChar(500)
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
+
+  userOrgRoles      UserOrgRole[]
+  createdOrders     Order[]
+  orderApprovals    OrderApproval[]
+  orderStatusLogOps OrderStatusLog[]
+  inventoryTransOps InventoryTransaction[]
+
+  @@map("users")
+}
+
+model UserOrgRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User         @relation(fields: [userId], references: [id])
+  org  Organization @relation(fields: [orgId], references: [id])
+  role Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, orgId, roleId])
+  @@map("user_org_roles")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  brandId     String?  @map("brand_id") @db.Uuid
+  code        String   @db.VarChar(50)
+  name        String?  @db.VarChar(100)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand           Brand?           @relation(fields: [brandId], references: [id])
+  userOrgRoles    UserOrgRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([brandId, code])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(100)
+  resource    String?  @db.VarChar(50)
+  action      String?  @db.VarChar(50)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Category {
+  id        String                @id @default(uuid()) @db.Uuid
+  brandId   String                @map("brand_id") @db.Uuid
+  parentId  String?               @map("parent_id") @db.Uuid
+  name      String                @db.VarChar(100)
+  sortOrder Int                   @default(0) @map("sort_order")
+  path      Unsupported("ltree")?
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand    Brand      @relation(fields: [brandId], references: [id])
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  spus     Spu[]
+
+  @@map("categories")
+}
+
+model Spu {
+  id            String      @id @default(uuid()) @db.Uuid
+  brandId       String      @map("brand_id") @db.Uuid
+  categoryId    String?     @map("category_id") @db.Uuid
+  spuCode       String      @unique @map("spu_code") @db.VarChar(50)
+  name          String      @db.VarChar(200)
+  unit          String?     @db.VarChar(20)
+  spec          String?     @db.VarChar(200)
+  images        Json?       @db.JsonB
+  shelfLifeDays Int?        @map("shelf_life_days")
+  storageType   StorageType @map("storage_type")
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand    Brand     @relation(fields: [brandId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
+  skus     Sku[]
+
+  @@map("spus")
+}
+
+model Sku {
+  id           String   @id @default(uuid()) @db.Uuid
+  spuId        String   @map("spu_id") @db.Uuid
+  brandId      String   @map("brand_id") @db.Uuid
+  skuCode      String   @unique @map("sku_code") @db.VarChar(50)
+  specDetail   String?  @map("spec_detail") @db.VarChar(200)
+  price        Int
+  costPrice    Int?     @map("cost_price")
+  weightKg     Decimal? @map("weight_kg") @db.Decimal(8, 3)
+  minOrderQty  Int      @default(1) @map("min_order_qty")
+  stepOrderQty Int      @default(1) @map("step_order_qty")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  spu                   Spu                    @relation(fields: [spuId], references: [id])
+  brand                 Brand                  @relation(fields: [brandId], references: [id])
+  pricePolicies         PricePolicy[]
+  inventories           Inventory[]
+  inventoryTransactions InventoryTransaction[]
+  orderItems            OrderItem[]
+  inTransitInventories  InTransitInventory[]
+
+  @@map("skus")
+}
+
+model PricePolicy {
+  id         String          @id @default(uuid()) @db.Uuid
+  brandId    String          @map("brand_id") @db.Uuid
+  skuId      String          @map("sku_id") @db.Uuid
+  policyType PricePolicyType @map("policy_type")
+  targetId   String?         @map("target_id") @db.Uuid
+  price      Int
+  startAt    DateTime?       @map("start_at") @db.Timestamptz()
+  endAt      DateTime?       @map("end_at") @db.Timestamptz()
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand Brand @relation(fields: [brandId], references: [id])
+  sku   Sku   @relation(fields: [skuId], references: [id])
+
+  @@unique([skuId, policyType, targetId, startAt])
+  @@map("price_policies")
+}
+
+model Order {
+  id              String        @id @default(uuid()) @db.Uuid
+  brandId         String        @map("brand_id") @db.Uuid
+  orderNo         String        @unique @map("order_no") @db.VarChar(32)
+  storeId         String        @map("store_id") @db.Uuid
+  orderType       OrderType     @default(sale) @map("order_type")
+  orderStatus     OrderStatus   @default(draft) @map("order_status")
+  totalAmount     Int           @map("total_amount")
+  paymentMethod   PaymentMethod @map("payment_method")
+  shippingAddress Json?         @map("shipping_address") @db.JsonB
+  expectedAt      DateTime?     @map("expected_at") @db.Date
+  notes           String?       @db.Text
+  createdBy       String        @map("created_by") @db.Uuid
+  submittedAt     DateTime?     @map("submitted_at") @db.Timestamptz()
+  approvedAt      DateTime?     @map("approved_at") @db.Timestamptz()
+  producedAt      DateTime?     @map("produced_at") @db.Timestamptz()
+  shippedAt       DateTime?     @map("shipped_at") @db.Timestamptz()
+  receivedAt      DateTime?     @map("received_at") @db.Timestamptz()
+  cancelledAt     DateTime?     @map("cancelled_at") @db.Timestamptz()
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand                Brand                @relation(fields: [brandId], references: [id])
+  store                Organization         @relation(fields: [storeId], references: [id])
+  createdByUser        User                 @relation(fields: [createdBy], references: [id])
+  orderItems           OrderItem[]
+  orderApprovals       OrderApproval[]
+  orderStatusLogs      OrderStatusLog[]
+  inTransitInventories InTransitInventory[]
+  receivable           Receivable?
+  accountTransactions  AccountTransaction[]
+
+  @@index([storeId, orderStatus, createdAt(sort: Desc)])
+  @@index([brandId, orderStatus, createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String     @id @default(uuid()) @db.Uuid
+  orderId     String     @map("order_id") @db.Uuid
+  brandId     String     @map("brand_id") @db.Uuid
+  skuId       String     @map("sku_id") @db.Uuid
+  skuCode     String     @map("sku_code") @db.VarChar(50)
+  skuName     String     @map("sku_name") @db.VarChar(200)
+  unitPrice   Int        @map("unit_price")
+  quantity    Decimal    @db.Decimal(10, 3)
+  shippedQty  Decimal    @default(0) @map("shipped_qty") @db.Decimal(10, 3)
+  receivedQty Decimal    @default(0) @map("received_qty") @db.Decimal(10, 3)
+  amount      Int
+  status      ItemStatus @default(normal)
+  lotNo       String?    @map("lot_no") @db.VarChar(50)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+
+  order Order @relation(fields: [orderId], references: [id])
+  brand Brand @relation(fields: [brandId], references: [id])
+  sku   Sku   @relation(fields: [skuId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderApproval {
+  id           String       @id @default(uuid()) @db.Uuid
+  orderId      String       @map("order_id") @db.Uuid
+  brandId      String       @map("brand_id") @db.Uuid
+  approverId   String       @map("approver_id") @db.Uuid
+  approvalType ApprovalType @map("approval_type")
+  comment      String?      @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+
+  order    Order @relation(fields: [orderId], references: [id])
+  brand    Brand @relation(fields: [brandId], references: [id])
+  approver User  @relation(fields: [approverId], references: [id])
+
+  @@map("order_approvals")
+}
+
+model OrderStatusLog {
+  id         String       @id @default(uuid()) @db.Uuid
+  orderId    String       @map("order_id") @db.Uuid
+  brandId    String       @map("brand_id") @db.Uuid
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+  operatorId String?      @map("operator_id") @db.Uuid
+  remark     String?      @db.Text
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+
+  order    Order @relation(fields: [orderId], references: [id])
+  brand    Brand @relation(fields: [brandId], references: [id])
+  operator User? @relation(fields: [operatorId], references: [id])
+
+  @@map("order_status_logs")
+}
+
+model Warehouse {
+  id            String        @id @default(uuid()) @db.Uuid
+  brandId       String        @map("brand_id") @db.Uuid
+  orgId         String        @map("org_id") @db.Uuid
+  warehouseType WarehouseType @map("warehouse_type")
+  name          String?       @db.VarChar(100)
+  address       Json?         @db.JsonB
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand                Brand                  @relation(fields: [brandId], references: [id])
+  org                  Organization           @relation(fields: [orgId], references: [id])
+  inventories          Inventory[]
+  InventoryTransaction InventoryTransaction[]
+
+  @@map("warehouses")
+}
+
+model Inventory {
+  id           String    @id @default(uuid()) @db.Uuid
+  brandId      String    @map("brand_id") @db.Uuid
+  warehouseId  String    @map("warehouse_id") @db.Uuid
+  skuId        String    @map("sku_id") @db.Uuid
+  lotNo        String    @map("lot_no") @db.VarChar(50)
+  quantity     Int       @default(0)
+  lockedQty    Int       @default(0) @map("locked_qty")
+  availableQty Int       @default(0) @map("available_qty")
+  unit         String?   @db.VarChar(20)
+  producedAt   DateTime? @map("produced_at") @db.Date
+  expiryAt     DateTime? @map("expiry_at") @db.Date
+  status       InvStatus @default(normal)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand     Brand     @relation(fields: [brandId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  sku       Sku       @relation(fields: [skuId], references: [id])
+
+  @@unique([warehouseId, skuId, lotNo])
+  @@index([skuId, warehouseId, expiryAt, availableQty])
+  @@map("inventory")
+}
+
+model InventoryTransaction {
+  id           String       @id @default(uuid()) @db.Uuid
+  brandId      String       @map("brand_id") @db.Uuid
+  warehouseId  String       @map("warehouse_id") @db.Uuid
+  skuId        String       @map("sku_id") @db.Uuid
+  lotNo        String       @map("lot_no") @db.VarChar(50)
+  transType    InvTransType @map("trans_type")
+  quantity     Int
+  balanceAfter Int          @map("balance_after")
+  bizType      String?      @map("biz_type") @db.VarChar(50)
+  bizId        String?      @map("biz_id") @db.Uuid
+  bizNo        String?      @map("biz_no") @db.VarChar(50)
+  operatorId   String?      @map("operator_id") @db.Uuid
+  remark       String?      @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand     Brand     @relation(fields: [brandId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  sku       Sku       @relation(fields: [skuId], references: [id])
+  operator  User?     @relation(fields: [operatorId], references: [id])
+
+  @@index([bizType, bizId])
+  @@index([skuId, createdAt])
+  @@map("inventory_transactions")
+}
+
+model InTransitInventory {
+  id         String          @id @default(uuid()) @db.Uuid
+  brandId    String          @map("brand_id") @db.Uuid
+  shipmentId String          @map("shipment_id") @db.Uuid
+  orderId    String          @map("order_id") @db.Uuid
+  skuId      String          @map("sku_id") @db.Uuid
+  lotNo      String?         @map("lot_no") @db.VarChar(50)
+  quantity   Int
+  status     InTransitStatus @default(in_transit)
+  shippedAt  DateTime        @default(now()) @map("shipped_at") @db.Timestamptz()
+  receivedAt DateTime?       @map("received_at") @db.Timestamptz()
+
+  brand Brand @relation(fields: [brandId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+  sku   Sku   @relation(fields: [skuId], references: [id])
+
+  @@map("in_transit_inventory")
+}
+
+model StoreAccount {
+  id               String        @id @default(uuid()) @db.Uuid
+  brandId          String        @map("brand_id") @db.Uuid
+  storeId          String        @unique @map("store_id") @db.Uuid
+  balance          Int           @default(0)
+  creditLimit      Int           @default(0) @map("credit_limit")
+  creditDays       Int           @default(30) @map("credit_days")
+  frozenAmount     Int           @default(0) @map("frozen_amount")
+  availableBalance Int           @default(0) @map("available_balance")
+  status           AccountStatus @default(normal)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand               Brand                @relation(fields: [brandId], references: [id])
+  store               Organization         @relation(fields: [storeId], references: [id])
+  accountTransactions AccountTransaction[]
+
+  @@map("store_accounts")
+}
+
+model AccountTransaction {
+  id           String    @id @default(uuid()) @db.Uuid
+  brandId      String    @map("brand_id") @db.Uuid
+  storeId      String    @map("store_id") @db.Uuid
+  orderId      String?   @map("order_id") @db.Uuid
+  transType    TransType @map("trans_type")
+  amount       Int
+  balanceAfter Int       @map("balance_after")
+  bizNo        String?   @map("biz_no") @db.VarChar(50)
+  remark       String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand          Brand         @relation(fields: [brandId], references: [id])
+  store          Organization  @relation(fields: [storeId], references: [id])
+  order          Order?        @relation(fields: [orderId], references: [id])
+  StoreAccount   StoreAccount? @relation(fields: [storeAccountId], references: [id])
+  storeAccountId String?       @db.Uuid
+
+  @@index([storeId, createdAt])
+  @@map("account_transactions")
+}
+
+model Receivable {
+  id         String           @id @default(uuid()) @db.Uuid
+  brandId    String           @map("brand_id") @db.Uuid
+  storeId    String           @map("store_id") @db.Uuid
+  orderId    String           @unique @map("order_id") @db.Uuid
+  amount     Int
+  paidAmount Int              @default(0) @map("paid_amount")
+  dueDate    DateTime         @map("due_date") @db.Date
+  status     ReceivableStatus @default(pending)
+  settledAt  DateTime?        @map("settled_at") @db.Timestamptz()
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand Brand        @relation(fields: [brandId], references: [id])
+  store Organization @relation(fields: [storeId], references: [id])
+  order Order        @relation(fields: [orderId], references: [id])
+
+  @@map("receivables")
+}
