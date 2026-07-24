@@ -4,6 +4,7 @@ import { RequirePermission } from '../../common/decorators/require-permission';
 import { BrandContext } from '../../common/decorators/brand-context';
 import { CurrentUser } from '../../common/decorators/current-user';
 import { JwtPayload } from '@hxfood/shared-types';
+import { CreateOrderDto } from './dto/create-order.dto';
 
 @Controller('orders')
 export class OrderController {
@@ -12,7 +13,7 @@ export class OrderController {
   @Post()
   @RequirePermission('order:create')
   async createOrder(
-    @Body() dto: any,
+    @Body() dto: CreateOrderDto,
     @BrandContext() ctx: any,
     @CurrentUser() user: JwtPayload,
   ) {
