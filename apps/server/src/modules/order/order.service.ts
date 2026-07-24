@@ -26,15 +26,6 @@ export class OrderService {
     if (!dto.items || dto.items.length === 0)
       throw new BadRequestException('Order must have at least one item');
 
-    // 幂等检查：同一幂等键直接返回已有订单
-    const existing = await this.prisma.order.findUnique({
-      where: { idempotencyKey: dto.idempotencyKey },
-      include: { orderItems: true, orderStatusLogs: { orderBy: { createdAt: 'asc' } } },
-    });
-    if (existing) {
-      return this.formatOrder(existing);
-    }
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayCount = await this.prisma.order.count({
@@ -43,6 +34,15 @@ export class OrderService {
     const orderNo = utils.generateOrderNo(new Date(), todayCount + 1);
 
     return this.prisma.$transaction(async (tx) => {
+      // 幂等检查：同一幂等键直接返回已有订单
+      const existing = await tx.order.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+        include: { orderItems: true, orderStatusLogs: { orderBy: { createdAt: 'asc' } } },
+      });
+      if (existing) {
+        return this.formatOrder(existing);
+      }
+
       let totalAmount = 0;
       const orderItems: any[] = [];
 
@@ -146,50 +146,52 @@ export class OrderService {
     if (toStatus === 'received') timestampFields.receivedAt = new Date();
     if (toStatus === 'cancelled') timestampFields.cancelledAt = new Date();
 
-    // 审核记录：审核/驳回/取消操作写入 order_approvals
-    if (['approved', 'rejected'].includes(toStatus)) {
-      await this.prisma.orderApproval.create({
-        data: {
-          brandId: order.brandId,
-          orderId: order.id,
-          approverId: operatorId,
-          approvalType: (toStatus === 'approved' ? 'review' : 'reject') as any,
-          comment: remark || null,
-        },
-      });
-    }
-
-    if (toStatus === 'cancelled') {
-      await this.prisma.orderApproval.create({
-        data: {
-          brandId: order.brandId,
-          orderId: order.id,
-          approverId: operatorId,
-          approvalType: 'cancel' as any,
-          comment: remark || null,
-        },
-      });
-    }
-
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        orderStatus: toStatus,
-        ...timestampFields,
-        orderStatusLogs: {
-          create: {
+    // 审核记录：审核/驳回/取消操作写入 order_approvals，与订单状态更新在同一事务中
+    return this.prisma.$transaction(async (tx) => {
+      if (['approved', 'rejected'].includes(toStatus)) {
+        await tx.orderApproval.create({
+          data: {
             brandId: order.brandId,
-            fromStatus: order.orderStatus,
-            toStatus,
-            operatorId,
-            remark: remark || '',
+            orderId: order.id,
+            approverId: operatorId,
+            approvalType: (toStatus === 'approved' ? 'review' : 'reject') as any,
+            comment: remark || null,
+          },
+        });
+      }
+
+      if (toStatus === 'cancelled') {
+        await tx.orderApproval.create({
+          data: {
+            brandId: order.brandId,
+            orderId: order.id,
+            approverId: operatorId,
+            approvalType: 'cancel' as any,
+            comment: remark || null,
+          },
+        });
+      }
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          orderStatus: toStatus,
+          ...timestampFields,
+          orderStatusLogs: {
+            create: {
+              brandId: order.brandId,
+              fromStatus: order.orderStatus,
+              toStatus,
+              operatorId,
+              remark: remark || '',
+            },
           },
         },
-      },
-      include: { orderItems: true, orderStatusLogs: { orderBy: { createdAt: 'asc' } } },
-    });
+        include: { orderItems: true, orderStatusLogs: { orderBy: { createdAt: 'asc' } } },
+      });
 
-    return this.formatOrder(updated);
+      return this.formatOrder(updated);
+    });
   }
 
   async findOrders(brandId: string, storeId?: string, status?: string, page = 1, pageSize = 20) {
