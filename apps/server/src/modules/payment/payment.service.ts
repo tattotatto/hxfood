@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PayDto } from './dto/pay.dto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -6,6 +7,25 @@ export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  async pay(dto: PayDto, brandId: string, storeId: string) {
+    // 查询订单，校验状态必须是 approved
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId, brandId },
+      include: { orderItems: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.orderStatus !== 'approved') {
+      throw new BadRequestException('Order must be approved before payment');
+    }
+
+    // 分发到余额或微信
+    if (dto.paymentMethod === 'balance') {
+      return this.payByBalance(order.id, brandId, storeId, order.totalAmount);
+    } else {
+      return this.createWechatPayment(order.id, 'mock_openid', order.totalAmount, order.orderNo);
+    }
+  }
 
   /** 微信支付统一下单 (JSAPI) — Phase 2 骨架，待对接真实 API */
   async createWechatPayment(orderId: string, openid: string, amountFen: number, description: string) {
