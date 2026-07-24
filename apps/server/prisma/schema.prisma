@@ -415,6 +415,7 @@ model Order {
   expectedAt      DateTime?     @map("expected_at") @db.Date
   notes           String?       @db.Text
   createdBy       String        @map("created_by") @db.Uuid
+  idempotencyKey  String?       @unique @map("idempotency_key") @db.VarChar(64)
   submittedAt     DateTime?     @map("submitted_at") @db.Timestamptz()
   approvedAt      DateTime?     @map("approved_at") @db.Timestamptz()
   producedAt      DateTime?     @map("produced_at") @db.Timestamptz()
