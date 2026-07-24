@@ -93,32 +93,43 @@ export class PaymentService {
     return { code: 'SUCCESS' };
   }
 
+  async getOrderForPayment(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, orderNo: true, totalAmount: true, orderStatus: true, brandId: true, storeId: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
   /** 余额支付 */
   async payByBalance(orderId: string, brandId: string, storeId: string, amountFen: number) {
-    const account = await this.prisma.storeAccount.findUnique({ where: { storeId } });
-    if (!account || account.balance - account.frozenAmount < amountFen) {
-      throw new Error('Insufficient balance');
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const account = await tx.storeAccount.findUnique({ where: { storeId } });
+      if (!account || account.balance - account.frozenAmount < amountFen) {
+        throw new BadRequestException('Insufficient balance');
+      }
 
-    const newBalance = account.balance - amountFen;
-    await this.prisma.storeAccount.update({
-      where: { storeId },
-      data: { balance: newBalance, updatedAt: new Date() },
+      const newBalance = account.balance - amountFen;
+      await tx.storeAccount.update({
+        where: { storeId },
+        data: { balance: newBalance, updatedAt: new Date() },
+      });
+
+      await tx.accountTransaction.create({
+        data: {
+          brandId,
+          storeId,
+          orderId,
+          transType: 'order_pay',
+          amount: -amountFen,
+          balanceAfter: newBalance,
+          remark: '余额支付',
+        },
+      });
+
+      this.logger.log(`[BalancePay] Order ${orderId}: deducted ¥${(amountFen / 100).toFixed(2)}`);
+      return { success: true, newBalance };
     });
-
-    await this.prisma.accountTransaction.create({
-      data: {
-        brandId,
-        storeId,
-        orderId,
-        transType: 'order_pay',
-        amount: -amountFen,
-        balanceAfter: newBalance,
-        remark: '余额支付',
-      },
-    });
-
-    this.logger.log(`[BalancePay] Order ${orderId}: deducted ¥${(amountFen / 100).toFixed(2)}`);
-    return { success: true, newBalance };
   }
 }

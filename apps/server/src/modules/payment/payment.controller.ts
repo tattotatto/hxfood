@@ -20,8 +20,9 @@ export class PaymentController {
   @Post('mock-confirm')
   @RequirePermission('order:create')
   async mockConfirm(@Body('orderId') orderId: string) {
+    const order = await this.paymentService.getOrderForPayment(orderId);
     return this.paymentService.handleWechatCallback(
-      { out_trade_no: orderId, transaction_id: `mock_txn_${Date.now()}`, amount: { total: 0 } },
+      { out_trade_no: order.orderNo, transaction_id: `mock_txn_${Date.now()}`, amount: { total: order.totalAmount } },
       '', '', '', '',
     );
   }

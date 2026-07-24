@@ -26,13 +26,6 @@ export class OrderService {
     if (!dto.items || dto.items.length === 0)
       throw new BadRequestException('Order must have at least one item');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayCount = await this.prisma.order.count({
-      where: { brandId, createdAt: { gte: today } },
-    });
-    const orderNo = utils.generateOrderNo(new Date(), todayCount + 1);
-
     return this.prisma.$transaction(async (tx) => {
       // 幂等检查：同一幂等键直接返回已有订单
       const existing = await tx.order.findUnique({
@@ -42,6 +35,13 @@ export class OrderService {
       if (existing) {
         return this.formatOrder(existing);
       }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayCount = await tx.order.count({
+        where: { brandId, createdAt: { gte: today } },
+      });
+      const orderNo = utils.generateOrderNo(new Date(), todayCount + 1);
 
       let totalAmount = 0;
       const orderItems: any[] = [];
@@ -132,22 +132,22 @@ export class OrderService {
     role: string,
     remark?: string,
   ) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found');
-    if (isTerminal(order.orderStatus))
-      throw new BadRequestException('Order is already in terminal state');
-
-    canTransition(order.orderStatus, toStatus, role);
-
-    const timestampFields: any = {};
-    if (toStatus === 'approved') timestampFields.approvedAt = new Date();
-    if (toStatus === 'produced') timestampFields.producedAt = new Date();
-    if (toStatus === 'shipped') timestampFields.shippedAt = new Date();
-    if (toStatus === 'received') timestampFields.receivedAt = new Date();
-    if (toStatus === 'cancelled') timestampFields.cancelledAt = new Date();
-
-    // 审核记录：审核/驳回/取消操作写入 order_approvals，与订单状态更新在同一事务中
     return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new NotFoundException('Order not found');
+      if (isTerminal(order.orderStatus))
+        throw new BadRequestException('Order is already in terminal state');
+
+      canTransition(order.orderStatus, toStatus, role);
+
+      const timestampFields: any = {};
+      if (toStatus === 'approved') timestampFields.approvedAt = new Date();
+      if (toStatus === 'produced') timestampFields.producedAt = new Date();
+      if (toStatus === 'shipped') timestampFields.shippedAt = new Date();
+      if (toStatus === 'received') timestampFields.receivedAt = new Date();
+      if (toStatus === 'cancelled') timestampFields.cancelledAt = new Date();
+
+      // 审核记录：审核/驳回/取消操作写入 order_approvals，与订单状态更新在同一事务中
       if (['approved', 'rejected'].includes(toStatus)) {
         await tx.orderApproval.create({
           data: {
