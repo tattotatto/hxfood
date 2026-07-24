@@ -4,6 +4,7 @@ import { ProductService } from '../product/product.service';
 import { ClsService } from 'nestjs-cls';
 import * as utils from '@hxfood/shared-utils';
 import { canTransition, isTerminal, OrderStatus } from './order.state-machine';
+import { CreateOrderDto } from './dto/create-order.dto';
 
 @Injectable()
 export class OrderService {
@@ -14,14 +15,7 @@ export class OrderService {
   ) {}
 
   async createOrder(
-    dto: {
-      idempotencyKey: string;
-      items: { skuId: string; quantity: number }[];
-      paymentMethod: string;
-      shippingAddress?: any;
-      expectedAt?: string;
-      notes?: string;
-    },
+    dto: CreateOrderDto,
     brandId: string,
     storeId: string,
     userId: string,
@@ -31,6 +25,15 @@ export class OrderService {
 
     if (!dto.items || dto.items.length === 0)
       throw new BadRequestException('Order must have at least one item');
+
+    // 幂等检查：同一幂等键直接返回已有订单
+    const existing = await this.prisma.order.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { orderItems: true, orderStatusLogs: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (existing) {
+      return this.formatOrder(existing);
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -86,6 +89,7 @@ export class OrderService {
           expectedAt: dto.expectedAt ? new Date(dto.expectedAt) : null,
           notes: dto.notes,
           createdBy: userId,
+          idempotencyKey: dto.idempotencyKey,
           submittedAt: new Date(),
           orderItems: { create: orderItems },
           orderStatusLogs: {
@@ -101,7 +105,23 @@ export class OrderService {
         include: { orderItems: true },
       });
 
-      return this.transition(order.id, 'pending_approval', userId, 'store_admin', '提交订单');
+      // 原子事务内完成：创建订单 + 状态日志
+      await tx.orderStatusLog.create({
+        data: {
+          brandId,
+          orderId: order.id,
+          toStatus: 'pending_approval' as any,
+          operatorId: userId,
+          remark: '提交订单',
+        },
+      });
+
+      const created = await tx.order.findUnique({
+        where: { id: order.id },
+        include: { orderItems: true, orderStatusLogs: { orderBy: { createdAt: 'asc' } } },
+      });
+      if (!created) throw new BadRequestException('Order creation failed');
+      return this.formatOrder(created);
     });
   }
 
@@ -125,6 +145,31 @@ export class OrderService {
     if (toStatus === 'shipped') timestampFields.shippedAt = new Date();
     if (toStatus === 'received') timestampFields.receivedAt = new Date();
     if (toStatus === 'cancelled') timestampFields.cancelledAt = new Date();
+
+    // 审核记录：审核/驳回/取消操作写入 order_approvals
+    if (['approved', 'rejected'].includes(toStatus)) {
+      await this.prisma.orderApproval.create({
+        data: {
+          brandId: order.brandId,
+          orderId: order.id,
+          approverId: operatorId,
+          approvalType: (toStatus === 'approved' ? 'review' : 'reject') as any,
+          comment: remark || null,
+        },
+      });
+    }
+
+    if (toStatus === 'cancelled') {
+      await this.prisma.orderApproval.create({
+        data: {
+          brandId: order.brandId,
+          orderId: order.id,
+          approverId: operatorId,
+          approvalType: 'cancel' as any,
+          comment: remark || null,
+        },
+      });
+    }
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
