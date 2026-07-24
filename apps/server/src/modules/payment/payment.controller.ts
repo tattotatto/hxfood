@@ -1,13 +1,32 @@
-import { Controller, Post, Body, Headers, Req } from '@nestjs/common';
+import { Controller, Post, Body, Headers } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { Public } from '../../common/decorators/public';
 import { RequirePermission } from '../../common/decorators/require-permission';
+import { BrandContext } from '../../common/decorators/brand-context';
+import { PayDto } from './dto/pay.dto';
 
 @Controller('payment')
 export class PaymentController {
   constructor(private paymentService: PaymentService) {}
 
-  /** 微信支付回调 — 公开接口，不需要认证（由微信签名验证保障） */
+  /** 统一支付入口 — 加盟店审核通过后发起 */
+  @Post('pay')
+  @RequirePermission('order:create')
+  async pay(@Body() dto: PayDto, @BrandContext() ctx: any) {
+    return this.paymentService.pay(dto, ctx.brandId, ctx.orgId);
+  }
+
+  /** Mock 微信支付确认 — 开发阶段手动确认 */
+  @Post('mock-confirm')
+  @RequirePermission('order:create')
+  async mockConfirm(@Body('orderId') orderId: string) {
+    return this.paymentService.handleWechatCallback(
+      { out_trade_no: orderId, transaction_id: `mock_txn_${Date.now()}`, amount: { total: 0 } },
+      '', '', '', '',
+    );
+  }
+
+  /** 微信支付回调 — 公开接口 */
   @Public()
   @Post('callback/wechat')
   async wechatCallback(
@@ -18,16 +37,5 @@ export class PaymentController {
     @Headers('wechatpay-nonce') nonce: string,
   ) {
     return this.paymentService.handleWechatCallback(body, signature, serial, timestamp, nonce);
-  }
-
-  /** 余额支付（加盟店在小程序发起） */
-  @Post('pay-by-balance')
-  @RequirePermission('order:create')
-  async payByBalance(
-    @Body() dto: { orderId: string; brandId: string; storeId: string; amountFen: number },
-  ) {
-    return this.paymentService.payByBalance(
-      dto.orderId, dto.brandId, dto.storeId, dto.amountFen,
-    );
   }
 }
