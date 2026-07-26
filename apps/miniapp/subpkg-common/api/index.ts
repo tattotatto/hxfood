@@ -45,3 +45,16 @@ export const orgApi = {
 export const paymentApi = {
   payByBalance: (data: any) => api.post('/payment/pay-by-balance', data),
 };
+
+// ── Brand ──
+export const brandApi = {
+  getList: () => api.get<any[]>('/brands'),
+  getDetail: (id: string) => api.get<any>(`/brands/${id}`),
+};
+
+// ── Franchise ──
+export const franchiseApi = {
+  apply: (data: any) => api.post<any>('/franchise/applications', data),
+  myApplications: () => api.get<any[]>('/franchise/my-applications'),
+  cancel: (id: string) => api.post<any>(`/franchise/applications/${id}/cancel`),
+};
