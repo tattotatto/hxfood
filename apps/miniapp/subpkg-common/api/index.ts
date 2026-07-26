@@ -48,8 +48,8 @@ export const paymentApi = {
 
 // ── Brand ──
 export const brandApi = {
-  getList: () => api.get<any[]>('/brands'),
-  getDetail: (id: string) => api.get<any>(`/brands/${id}`),
+  getList: () => api.get<any[]>('/products/brands'),
+  getDetail: (id: string) => api.get<any>(`/products/brands/${id}`),
 };
 
 // ── Franchise ──
