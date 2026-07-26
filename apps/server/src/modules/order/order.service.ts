@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ProductService } from '../product/product.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { ClsService } from 'nestjs-cls';
 import * as utils from '@hxfood/shared-utils';
 import { canTransition, isTerminal, OrderStatus } from './order.state-machine';
@@ -8,9 +9,12 @@ import { CreateOrderDto } from './dto/create-order.dto';
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     private prisma: PrismaService,
     private productService: ProductService,
+    private inventoryService: InventoryService,
     private cls: ClsService,
   ) {}
 
@@ -132,13 +136,20 @@ export class OrderService {
     role: string,
     remark?: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    let orderNo: string;
+    let brandId: string;
+
+    const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new NotFoundException('Order not found');
       if (isTerminal(order.orderStatus))
         throw new BadRequestException('Order is already in terminal state');
 
       canTransition(order.orderStatus, toStatus, role);
+
+      // Capture for post-transaction triggers
+      orderNo = order.orderNo;
+      brandId = order.brandId;
 
       const timestampFields: any = {};
       if (toStatus === 'approved') timestampFields.approvedAt = new Date();
@@ -192,6 +203,20 @@ export class OrderService {
 
       return this.formatOrder(updated);
     });
+
+    // Post-transaction inventory triggers (non-blocking)
+    if (toStatus === 'approved') {
+      this.inventoryService.lockStockForOrder(orderId, brandId!).catch(e =>
+        this.logger.error(`Lock stock failed for order ${orderNo!}: ${e.message}`),
+      );
+    }
+    if (toStatus === 'cancelled') {
+      this.inventoryService.unlockStock(orderNo!, brandId!).catch(e =>
+        this.logger.error(`Unlock stock failed for order ${orderNo!}: ${e.message}`),
+      );
+    }
+
+    return result;
   }
 
   async findOrders(brandId: string, storeId?: string, status?: string, page = 1, pageSize = 20) {

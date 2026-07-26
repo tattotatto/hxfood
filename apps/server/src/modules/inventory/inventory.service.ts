@@ -85,6 +85,25 @@ export class InventoryService {
     });
   }
 
+  // ── 锁定订单全部商品库存 ──
+  async lockStockForOrder(orderId: string, brandId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { orderItems: true },
+    });
+    if (!order) throw new Error('Order not found');
+
+    // 找到成品仓库
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { brandId, warehouseType: 'finished' },
+    });
+    if (!warehouse) return; // 无仓库则跳过
+
+    for (const item of order.orderItems) {
+      await this.lockStock(item.skuId, warehouse.id, brandId, Number(item.quantity), order.orderNo);
+    }
+  }
+
   // ── 释放预占（订单取消时调用） ──
   async unlockStock(orderNo: string, brandId: string) {
     const txs = await this.prisma.inventoryTransaction.findMany({

@@ -23,6 +23,39 @@ export class ProductionService {
     return { success: true, orderId: dto.orderId, status: 'pending_production' };
   }
 
+  /** 生产工单列表 */
+  async listProductionOrders(brandId: string, params: { status?: string; page?: number; pageSize?: number }) {
+    const where: any = { brandId, orderStatus: { in: ['pending_production', 'in_production', 'partially_produced', 'produced'] } };
+    if (params.status) where.orderStatus = params.status;
+    const page = params.page || 1;
+    const pageSize = params.pageSize || 20;
+
+    const [items, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: { store: { select: { name: true } }, orderItems: { include: { sku: { select: { skuCode: true } } } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+    return { items, total, page, pageSize };
+  }
+
+  /** 开始生产 */
+  async startProduction(orderId: string, brandId: string, operatorId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('Order not found');
+    if (!['pending_production'].includes(order.orderStatus)) throw new Error('Invalid status');
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { orderStatus: 'in_production', orderStatusLogs: { create: { brandId, fromStatus: order.orderStatus, toStatus: 'in_production', operatorId, remark: '开始生产' } } },
+    });
+    return { success: true, status: 'in_production' };
+  }
+
   /** 生产完成入库 */
   async completeProduction(brandId: string, dto: {
     orderId: string; warehouseId: string; items: { skuId: string; lotNo: string; quantity: number }[];
