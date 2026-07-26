@@ -176,6 +176,18 @@ enum ReceivableStatus {
   @@map("receivable_status_enum")
 }
 
+enum FranchiseAppStatus {
+  submitted
+  under_review
+  approved
+  payment_confirmed
+  activated
+  rejected
+  cancelled
+
+  @@map("franchise_app_status_enum")
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Models
 //////////////////////////////////////////////////////////////////////////////
@@ -206,6 +218,7 @@ model Brand {
   storeAccounts         StoreAccount[]
   accountTransactions   AccountTransaction[]
   receivables           Receivable[]
+  franchiseApplications FranchiseApplication[]
 
   @@map("brands")
 }
@@ -258,6 +271,8 @@ model User {
   orderApprovals    OrderApproval[]
   orderStatusLogOps OrderStatusLog[]
   inventoryTransOps InventoryTransaction[]
+  reviewedApplications            FranchiseApplication[] @relation("ReviewerRel")
+  paymentConfirmedApplications    FranchiseApplication[] @relation("PaymentConfirmerRel")
 
   @@map("users")
 }
@@ -640,4 +655,36 @@ model Receivable {
   order Order        @relation(fields: [orderId], references: [id])
 
   @@map("receivables")
+}
+
+model FranchiseApplication {
+  id                 String              @id @default(uuid()) @db.Uuid
+  brandId            String              @map("brand_id") @db.Uuid
+  applicantName      String              @map("applicant_name") @db.VarChar(50)
+  applicantPhone     String              @map("applicant_phone") @db.VarChar(20)
+  applicantOpenid    String?             @map("applicant_openid") @db.VarChar(64)
+  storeName          String              @map("store_name") @db.VarChar(200)
+  city               String              @db.VarChar(50)
+  address            String              @db.VarChar(300)
+  investmentBudget   Decimal?            @map("investment_budget") @db.Decimal(12, 2)
+  status             FranchiseAppStatus  @default(submitted)
+  reviewerId         String?             @map("reviewer_id") @db.Uuid
+  reviewComment      String?             @db.Text
+  reviewedAt         DateTime?           @map("reviewed_at") @db.Timestamptz()
+  paymentConfirmedBy String?             @map("payment_confirmed_by") @db.Uuid
+  paymentConfirmedAt DateTime?           @map("payment_confirmed_at") @db.Timestamptz()
+  paymentRemark      String?             @db.Text
+  activatedAt        DateTime?           @map("activated_at") @db.Timestamptz()
+  createdOrgId       String?             @map("created_org_id") @db.Uuid
+  remark             String?             @db.Text
+  documents          Json?               @db.JsonB
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand            Brand @relation(fields: [brandId], references: [id])
+  reviewer         User? @relation("ReviewerRel", fields: [reviewerId], references: [id])
+  paymentConfirmer User? @relation("PaymentConfirmerRel", fields: [paymentConfirmedBy], references: [id])
+
+  @@index([brandId, status, createdAt(sort: Desc)])
+  @@map("franchise_applications")
 }
