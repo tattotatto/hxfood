@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SkuVo } from '@hxfood/shared-types';
 
@@ -179,5 +179,49 @@ export class ProductService {
     return this.prisma.pricePolicy.create({
       data: { brandId, ...dto } as any,
     });
+  }
+
+  // ── 品牌公开接口 ──
+  async getBrands() {
+    const brands = await this.prisma.brand.findMany({
+      where: { status: 'active' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        organizations: {
+          where: { orgType: 'franchise_store', status: 'active' },
+          select: { id: true },
+        },
+      },
+    });
+
+    return brands.map((b) => ({
+      id: b.id,
+      name: b.name,
+      code: b.code,
+      logo: (b.config as any)?.logo || null,
+      description: (b.config as any)?.description || '',
+      storeCount: b.organizations.length,
+    }));
+  }
+
+  async getBrandDetail(id: string) {
+    const brand = await this.prisma.brand.findUnique({
+      where: { id },
+      include: {
+        organizations: {
+          where: { orgType: 'franchise_store', status: 'active' },
+          select: { id: true },
+        },
+      },
+    });
+    if (!brand) throw new NotFoundException('Brand not found');
+    return {
+      id: brand.id,
+      name: brand.name,
+      code: brand.code,
+      config: brand.config || {},
+      storeCount: brand.organizations.length,
+      createdAt: brand.createdAt,
+    };
   }
 }

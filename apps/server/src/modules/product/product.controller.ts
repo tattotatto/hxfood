@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { RequirePermission } from '../../common/decorators/require-permission';
 import { BrandContext } from '../../common/decorators/brand-context';
+import { Public } from '../../common/decorators/public';
 
 @Controller('products')
 export class ProductController {
@@ -63,5 +64,18 @@ export class ProductController {
   @RequirePermission('product:manage')
   async createPricePolicy(@BrandContext() ctx: any, @Body() dto: any) {
     return this.productService.createPricePolicy(ctx.brandId, dto);
+  }
+
+  // ── 品牌公开接口（prospect 浏览用）──
+  @Public()
+  @Get('brands')
+  async getBrands() {
+    return this.productService.getBrands();
+  }
+
+  @Public()
+  @Get('brands/:id')
+  async getBrandDetail(@Param('id') id: string) {
+    return this.productService.getBrandDetail(id);
   }
 }
