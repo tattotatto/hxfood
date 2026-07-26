@@ -14,6 +14,14 @@
         <div class="stat-number">{{ stats.totalStores }}</div>
         <div class="stat-label">门店总数</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ stats.pendingApplications }}</div>
+        <div class="stat-label">待审核加盟申请</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ stats.awaitingPayment }}</div>
+        <div class="stat-label">待缴费加盟</div>
+      </div>
     </div>
     <div v-if="loading" class="loading">加载中...</div>
     <div v-if="!loading && error" class="error">{{ error }}</div>
@@ -24,14 +32,30 @@
 import { ref, onMounted } from 'vue'
 import api from '../api'
 
-const stats = ref({ todayOrders: 0, pendingApproval: 0, totalStores: 0 })
+const stats = ref({
+  todayOrders: 0,
+  pendingApproval: 0,
+  totalStores: 0,
+  pendingApplications: 0,
+  awaitingPayment: 0,
+})
 const loading = ref(true)
 const error = ref('')
 
 onMounted(async () => {
   try {
-    const res = await api.get('/dashboard/stats')
-    stats.value = res.data
+    const [dashRes, pendingRes, paymentRes] = await Promise.all([
+      api.get('/dashboard/stats'),
+      api.get('/franchise/applications', { params: { status: 'submitted', pageSize: 1 } }),
+      api.get('/franchise/applications', { params: { status: 'approved', pageSize: 1 } }),
+    ])
+    stats.value = {
+      todayOrders: dashRes.data.todayOrders || 0,
+      pendingApproval: dashRes.data.pendingApproval || 0,
+      totalStores: dashRes.data.totalStores || 0,
+      pendingApplications: pendingRes.data.total || 0,
+      awaitingPayment: paymentRes.data.total || 0,
+    }
   } catch (e: any) {
     error.value = e.message || '加载失败'
   } finally {
@@ -43,7 +67,7 @@ onMounted(async () => {
 <style scoped>
 .dashboard { max-width: 1200px; }
 h2 { font-size: 20px; margin-bottom: 24px; }
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
 .stat-card { background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .stat-number { font-size: 36px; font-weight: 700; color: #1a1a2e; }
 .stat-label { font-size: 14px; color: #999; margin-top: 8px; }
