@@ -148,6 +148,16 @@ enum InTransitStatus {
   @@map("in_transit_status_enum")
 }
 
+enum ShipmentStatus {
+  pending
+  shipped
+  partially_received
+  received
+  cancelled
+
+  @@map("shipment_status_enum")
+}
+
 enum AccountStatus {
   normal
   frozen
@@ -219,6 +229,7 @@ model Brand {
   accountTransactions   AccountTransaction[]
   receivables           Receivable[]
   franchiseApplications FranchiseApplication[]
+  shipments              Shipment[]
 
   @@map("brands")
 }
@@ -249,6 +260,7 @@ model Organization {
   storeAccount        StoreAccount?
   accountTransactions AccountTransaction[]
   receivables         Receivable[]
+  shipments           Shipment[]
 
   @@map("organizations")
 }
@@ -273,6 +285,7 @@ model User {
   inventoryTransOps InventoryTransaction[]
   reviewedApplications            FranchiseApplication[] @relation("ReviewerRel")
   paymentConfirmedApplications    FranchiseApplication[] @relation("PaymentConfirmerRel")
+  shipments                       Shipment[]
 
   @@map("users")
 }
@@ -447,6 +460,7 @@ model Order {
   orderApprovals       OrderApproval[]
   orderStatusLogs      OrderStatusLog[]
   inTransitInventories InTransitInventory[]
+  shipments            Shipment[]
   receivable           Receivable?
   accountTransactions  AccountTransaction[]
 
@@ -524,6 +538,7 @@ model Warehouse {
   org                  Organization           @relation(fields: [orgId], references: [id])
   inventories          Inventory[]
   InventoryTransaction InventoryTransaction[]
+  shipments             Shipment[]
 
   @@map("warehouses")
 }
@@ -590,9 +605,10 @@ model InTransitInventory {
   shippedAt  DateTime        @default(now()) @map("shipped_at") @db.Timestamptz()
   receivedAt DateTime?       @map("received_at") @db.Timestamptz()
 
-  brand Brand @relation(fields: [brandId], references: [id])
-  order Order @relation(fields: [orderId], references: [id])
-  sku   Sku   @relation(fields: [skuId], references: [id])
+  brand    Brand    @relation(fields: [brandId], references: [id])
+  order    Order    @relation(fields: [orderId], references: [id])
+  sku      Sku      @relation(fields: [skuId], references: [id])
+  shipment Shipment @relation(fields: [shipmentId], references: [id])
 
   @@map("in_transit_inventory")
 }
@@ -655,6 +671,35 @@ model Receivable {
   order Order        @relation(fields: [orderId], references: [id])
 
   @@map("receivables")
+}
+
+model Shipment {
+  id              String          @id @default(uuid()) @db.Uuid
+  brandId         String          @map("brand_id") @db.Uuid
+  shipmentNo      String          @unique @map("shipment_no") @db.VarChar(32)
+  orderId         String          @map("order_id") @db.Uuid
+  fromWarehouseId String          @map("from_warehouse_id") @db.Uuid
+  toStoreId       String          @map("to_store_id") @db.Uuid
+  status          ShipmentStatus  @default(pending)
+  carrier         String?         @db.VarChar(100)
+  trackingNo      String?         @map("tracking_no") @db.VarChar(100)
+  shippedAt       DateTime?       @map("shipped_at") @db.Timestamptz()
+  receivedAt      DateTime?       @map("received_at") @db.Timestamptz()
+  notes           String?         @db.Text
+  createdBy       String          @map("created_by") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  brand         Brand              @relation(fields: [brandId], references: [id])
+  order         Order              @relation(fields: [orderId], references: [id])
+  fromWarehouse Warehouse          @relation(fields: [fromWarehouseId], references: [id])
+  toStore       Organization       @relation(fields: [toStoreId], references: [id])
+  createdByUser User               @relation(fields: [createdBy], references: [id])
+  inTransits    InTransitInventory[]
+
+  @@index([orderId])
+  @@index([brandId, status, createdAt(sort: Desc)])
+  @@map("shipments")
 }
 
 model FranchiseApplication {
