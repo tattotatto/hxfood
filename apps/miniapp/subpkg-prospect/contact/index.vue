@@ -24,6 +24,9 @@
   </view>
 </template>
 
+<script setup lang="ts">
+</script>
+
 <style lang="scss" scoped>
 .page { padding: 24rpx; background: #f5f5f5; min-height: 100vh; }
 .card { background: #fff; border-radius: 16rpx; padding: 30rpx; margin-bottom: 20rpx; text-align: center; }
