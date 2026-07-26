@@ -130,6 +130,7 @@ export class AuthService {
         ),
       ),
     ];
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const payload: JwtPayload = {
       sub: userId,
       orgId: defaultOrg.org.id,
@@ -137,6 +138,7 @@ export class AuthService {
       brands,
       roles,
       permissions,
+      openid: user?.openid || undefined,
     };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '2h' });
     const refreshToken = this.jwtService.sign(payload, {

@@ -7,6 +7,7 @@ import { RbacModule } from './modules/rbac/rbac.module';
 import { ProductModule } from './modules/product/product.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { FranchiseModule } from './modules/franchise/franchise.module';
 import { OrgModule } from './modules/organization/org.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProductionModule } from './modules/production/production.module';
@@ -19,7 +20,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 @Module({
-  imports: [ClsModule, PrismaModule, AuthModule, RbacModule, ProductModule, OrderModule, PaymentModule, OrgModule, InventoryModule, ProductionModule, FinanceModule],
+  imports: [ClsModule, PrismaModule, AuthModule, RbacModule, ProductModule, OrderModule, PaymentModule, FranchiseModule, OrgModule, InventoryModule, ProductionModule, FinanceModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: BrandGuard },

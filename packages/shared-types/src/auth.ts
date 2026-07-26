@@ -5,6 +5,7 @@ export interface JwtPayload {
   brands: string[];
   roles: string[];
   permissions: string[];
+  openid?: string;
   iat?: number;
   exp?: number;
 }
