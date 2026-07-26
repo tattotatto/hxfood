@@ -30,5 +30,10 @@ export class CreateApplicationDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
+  applicantOpenid?: string;
+
+  @IsOptional()
+  @IsString()
   remark?: string;
 }

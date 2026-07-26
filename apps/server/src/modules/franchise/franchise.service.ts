@@ -20,6 +20,7 @@ export class FranchiseService {
         brandId: dto.brandId,
         applicantName: dto.applicantName,
         applicantPhone: dto.applicantPhone,
+        applicantOpenid: dto.applicantOpenid || null,
         storeName: dto.storeName,
         city: dto.city,
         address: dto.address,
@@ -76,55 +77,59 @@ export class FranchiseService {
 
   // ── 总部审核 ──
   async reviewApplication(id: string, dto: ReviewApplicationDto, reviewerId: string) {
-    const app = await this.prisma.franchiseApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Application not found');
-    if (app.status !== 'submitted' && app.status !== 'under_review') {
-      throw new BadRequestException(`Cannot review application in status: ${app.status}`);
-    }
-
     if (!dto.approved && !dto.comment) {
       throw new BadRequestException('Rejection reason (comment) is required');
     }
 
-    return this.prisma.franchiseApplication.update({
-      where: { id },
-      data: {
-        status: dto.approved ? 'approved' : 'rejected',
-        reviewerId,
-        reviewComment: dto.comment || null,
-        reviewedAt: new Date(),
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const app = await tx.franchiseApplication.findUnique({ where: { id } });
+      if (!app) throw new NotFoundException('Application not found');
+      if (app.status !== 'submitted' && app.status !== 'under_review') {
+        throw new BadRequestException(`Cannot review application in status: ${app.status}`);
+      }
+
+      return tx.franchiseApplication.update({
+        where: { id },
+        data: {
+          status: dto.approved ? 'approved' : 'rejected',
+          reviewerId,
+          reviewComment: dto.comment || null,
+          reviewedAt: new Date(),
+        },
+      });
     });
   }
 
   // ── 总部确认缴费 ──
   async confirmPayment(id: string, dto: ConfirmPaymentDto, operatorId: string) {
-    const app = await this.prisma.franchiseApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Application not found');
-    if (app.status !== 'approved') {
-      throw new BadRequestException(`Cannot confirm payment for status: ${app.status}`);
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const app = await tx.franchiseApplication.findUnique({ where: { id } });
+      if (!app) throw new NotFoundException('Application not found');
+      if (app.status !== 'approved') {
+        throw new BadRequestException(`Cannot confirm payment for status: ${app.status}`);
+      }
 
-    return this.prisma.franchiseApplication.update({
-      where: { id },
-      data: {
-        status: 'payment_confirmed',
-        paymentConfirmedBy: operatorId,
-        paymentConfirmedAt: new Date(),
-        paymentRemark: dto.remark || null,
-      },
+      return tx.franchiseApplication.update({
+        where: { id },
+        data: {
+          status: 'payment_confirmed',
+          paymentConfirmedBy: operatorId,
+          paymentConfirmedAt: new Date(),
+          paymentRemark: dto.remark || null,
+        },
+      });
     });
   }
 
   // ── 总部激活（创建组织+账户+角色）──
   async activate(id: string, operatorId: string) {
-    const app = await this.prisma.franchiseApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Application not found');
-    if (app.status !== 'payment_confirmed') {
-      throw new BadRequestException(`Cannot activate application in status: ${app.status}`);
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      const app = await tx.franchiseApplication.findUnique({ where: { id } });
+      if (!app) throw new NotFoundException('Application not found');
+      if (app.status !== 'payment_confirmed') {
+        throw new BadRequestException(`Cannot activate application in status: ${app.status}`);
+      }
+
       // 1. 创建 Organization
       const org = await tx.organization.create({
         data: {
@@ -171,12 +176,14 @@ export class FranchiseService {
       }
 
       // 4. 更新申请为已激活
+      const existingDocuments = (app.documents as Record<string, any>) || {};
       await tx.franchiseApplication.update({
         where: { id },
         data: {
           status: 'activated',
           createdOrgId: org.id,
           activatedAt: new Date(),
+          documents: { ...existingDocuments, activatedBy: operatorId },
         },
       });
 
@@ -186,18 +193,20 @@ export class FranchiseService {
 
   // ── 加盟者主动撤销 ──
   async cancel(id: string, openid: string) {
-    const app = await this.prisma.franchiseApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Application not found');
-    if (app.status !== 'submitted' && app.status !== 'under_review') {
-      throw new BadRequestException(`Cannot cancel application in status: ${app.status}`);
-    }
-    if (app.applicantOpenid && app.applicantOpenid !== openid) {
-      throw new ForbiddenException('Not your application');
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const app = await tx.franchiseApplication.findUnique({ where: { id } });
+      if (!app) throw new NotFoundException('Application not found');
+      if (app.status !== 'submitted' && app.status !== 'under_review') {
+        throw new BadRequestException(`Cannot cancel application in status: ${app.status}`);
+      }
+      if (app.applicantOpenid && app.applicantOpenid !== openid) {
+        throw new ForbiddenException('Not your application');
+      }
 
-    return this.prisma.franchiseApplication.update({
-      where: { id },
-      data: { status: 'cancelled' },
+      return tx.franchiseApplication.update({
+        where: { id },
+        data: { status: 'cancelled' },
+      });
     });
   }
 }
