@@ -11,6 +11,7 @@ import { FranchiseModule } from './modules/franchise/franchise.module';
 import { OrgModule } from './modules/organization/org.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProductionModule } from './modules/production/production.module';
+import { ShipmentModule } from './modules/shipment/shipment.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RbacGuard } from './common/guards/rbac.guard';
@@ -20,7 +21,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 @Module({
-  imports: [ClsModule, PrismaModule, AuthModule, RbacModule, ProductModule, OrderModule, PaymentModule, FranchiseModule, OrgModule, InventoryModule, ProductionModule, FinanceModule],
+  imports: [ClsModule, PrismaModule, AuthModule, RbacModule, ProductModule, OrderModule, PaymentModule, FranchiseModule, OrgModule, InventoryModule, ProductionModule, ShipmentModule, FinanceModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: BrandGuard },
