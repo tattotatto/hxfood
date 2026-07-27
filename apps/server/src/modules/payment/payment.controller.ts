@@ -16,6 +16,13 @@ export class PaymentController {
     return this.paymentService.pay(dto, ctx.brandId, ctx.orgId);
   }
 
+  /** 管理员充值 */
+  @Post('recharge')
+  @RequirePermission('finance:manage')
+  async recharge(@Body() dto: { storeId: string; amountFen: number; remark?: string }, @BrandContext() ctx: any) {
+    return this.paymentService.recharge(dto, ctx.brandId);
+  }
+
   /** Mock 微信支付确认 — 开发阶段手动确认 */
   @Post('mock-confirm')
   @RequirePermission('order:create')

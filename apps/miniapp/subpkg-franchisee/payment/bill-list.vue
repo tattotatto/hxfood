@@ -40,7 +40,7 @@
             <text class="bill-order-no" v-if="bill.orderNo">{{ bill.orderNo }}</text>
           </view>
           <text class="bill-amount" :class="bill.type === 'income' ? 'income' : 'expense'">
-            {{ bill.type === 'income' ? '+' : '-' }}¥{{ (bill.amount / 100).toFixed(2) }}
+            {{ bill.type === 'income' ? '+' : '-' }}¥{{ Math.abs(bill.amount).toFixed(2) }}
           </text>
         </view>
       </view>
@@ -50,7 +50,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import api from '@/subpkg-common/api/request';
 
 interface BillItem {
   id: string;
@@ -64,59 +65,60 @@ interface BillItem {
 const now = new Date();
 const currentYear = ref(now.getFullYear());
 const currentMonth = ref(now.getMonth() + 1);
+const loading = ref(false);
 
-// Generate mock bills
-const allBills = ref<BillItem[]>(generateMockBills());
+const allBills = ref<BillItem[]>([]);
 
-function generateMockBills(): BillItem[] {
-  const base = new Date(currentYear.value, currentMonth.value - 1, 1);
-  const daysInMonth = new Date(currentYear.value, currentMonth.value, 0).getDate();
-  const items: BillItem[] = [];
-  let id = 1;
+const transTypeLabel: Record<string, string> = {
+  recharge: '账户充值',
+  order_pay: '订单支出',
+  refund: '订单退款',
+  adjustment: '余额调整',
+  credit_repay: '信用还款',
+};
 
-  // ~10 bill items scattered across the month
-  const billDays = [3, 5, 8, 12, 15, 18, 20, 22, 25, 28];
-  const descs = [
-    '订单支出', '订单支出', '账户充值', '订单退款',
-    '订单支出', '平台服务费', '订单支出', '奖励金',
-    '订单支出', '账户提现',
-  ];
-  const types: ('income' | 'expense')[] = [
-    'expense', 'expense', 'income', 'income',
-    'expense', 'expense', 'expense', 'income',
-    'expense', 'expense',
-  ];
-
-  for (let i = 0; i < billDays.length && i < descs.length; i++) {
-    const d = billDays[i];
-    const date = new Date(base);
-    date.setDate(Math.min(d, daysInMonth));
-    items.push({
-      id: String(id++),
-      description: descs[i],
-      orderNo: types[i] === 'expense' ? `ORD${currentYear.value}${String(currentMonth.value).padStart(2, '0')}${String(d).padStart(2, '0')}00${i + 1}` : undefined,
-      amount: Math.round((50000 + Math.random() * 200000)),
-      type: types[i],
-      createdAt: date.toISOString(),
-    });
+async function fetchBills() {
+  loading.value = true;
+  try {
+    const res: any = await api.get('/finance/my-transactions', { page: 1, pageSize: 200 });
+    const items = res?.items || [];
+    allBills.value = items
+      .filter((t: any) => {
+        const d = new Date(t.createdAt);
+        return d.getFullYear() === currentYear.value && (d.getMonth() + 1) === currentMonth.value;
+      })
+      .map((t: any) => ({
+        id: t.id,
+        description: t.remark || transTypeLabel[t.transType] || t.transType,
+        orderNo: t.bizNo || undefined,
+        amount: t.amount, // yuan
+        type: t.amount >= 0 ? 'income' : 'expense',
+        createdAt: t.createdAt,
+      }))
+      .sort((a: BillItem, b: BillItem) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch {
+    allBills.value = [];
+  } finally {
+    loading.value = false;
   }
-  return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+onMounted(fetchBills);
+
 const monthExpense = computed(() => {
-  const total = allBills.value.filter(b => b.type === 'expense').reduce((s, b) => s + b.amount, 0);
-  return (total / 100).toFixed(2);
+  const total = allBills.value.filter(b => b.type === 'expense').reduce((s, b) => s + Math.abs(b.amount), 0);
+  return total.toFixed(2);
 });
 
 const monthIncome = computed(() => {
   const total = allBills.value.filter(b => b.type === 'income').reduce((s, b) => s + b.amount, 0);
-  return (total / 100).toFixed(2);
+  return total.toFixed(2);
 });
 
 const monthNet = computed(() => {
   const inc = allBills.value.filter(b => b.type === 'income').reduce((s, b) => s + b.amount, 0);
-  const exp = allBills.value.filter(b => b.type === 'expense').reduce((s, b) => s + b.amount, 0);
-  return (inc - exp) / 100;
+  const exp = allBills.value.filter(b => b.type === 'expense').reduce((s, b) => s + Math.abs(b.amount), 0);
+  return inc - exp;
 });
 
 const groupedBills = computed(() => {
@@ -129,7 +131,7 @@ const groupedBills = computed(() => {
   return Object.entries(groups).map(([date, items]) => ({
     date,
     items,
-    totalYuan: (items.reduce((s, b) => s + b.amount, 0) / 100).toFixed(2),
+    totalYuan: items.reduce((s, b) => s + Math.abs(b.amount), 0).toFixed(2),
   }));
 });
 
@@ -140,7 +142,7 @@ function prevMonth() {
   } else {
     currentMonth.value--;
   }
-  allBills.value = generateMockBills();
+  fetchBills();
 }
 
 function nextMonth() {
@@ -150,7 +152,7 @@ function nextMonth() {
   } else {
     currentMonth.value++;
   }
-  allBills.value = generateMockBills();
+  fetchBills();
 }
 </script>
 

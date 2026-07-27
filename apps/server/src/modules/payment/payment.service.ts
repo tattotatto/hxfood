@@ -50,6 +50,29 @@ export class PaymentService {
     };
   }
 
+  /** 管理员充值 */
+  async recharge(dto: { storeId: string; amountFen: number; remark?: string }, brandId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const account = await tx.storeAccount.findUniqueOrThrow({ where: { storeId: dto.storeId } });
+      const newBalance = account.balance + dto.amountFen;
+      await tx.storeAccount.update({
+        where: { storeId: dto.storeId },
+        data: { balance: newBalance, updatedAt: new Date() },
+      });
+      await tx.accountTransaction.create({
+        data: {
+          brandId,
+          storeId: dto.storeId,
+          transType: 'recharge',
+          amount: dto.amountFen,
+          balanceAfter: newBalance,
+          remark: dto.remark || '管理员充值',
+        },
+      });
+      return { success: true, newBalance };
+    });
+  }
+
   /** 处理微信支付回调 */
   async handleWechatCallback(body: any, signature: string, serial: string, timestamp: string, nonce: string) {
     this.logger.log(`[WechatPay] Callback received for out_trade_no: ${body.out_trade_no}`);

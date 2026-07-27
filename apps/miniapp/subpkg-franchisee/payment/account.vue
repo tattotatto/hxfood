@@ -23,10 +23,24 @@
             <text class="tx-time">{{ formatTime(tx.createdAt) }}</text>
           </view>
           <text class="tx-amount" :class="tx.type === 'income' ? 'tx-income' : 'tx-expense'">
-            {{ tx.type === 'income' ? '+' : '-' }}¥{{ (tx.amount / 100).toFixed(2) }}
+            {{ tx.type === 'income' ? '+' : '-' }}¥{{ Math.abs(tx.amount).toFixed(2) }}
           </text>
         </view>
         <view v-if="transactions.length === 0" class="empty">暂无交易记录</view>
+      </view>
+    </view>
+
+    <!-- 充值记录 -->
+    <view class="section" v-if="rechargeRecords.length > 0">
+      <view class="section-title">充值记录</view>
+      <view class="tx-list">
+        <view class="tx-item" v-for="rec in rechargeRecords" :key="'r' + rec.id">
+          <view class="tx-info">
+            <text class="tx-desc">{{ rec.remark || '账户充值' }}</text>
+            <text class="tx-time">{{ formatTime(rec.createdAt) }}</text>
+          </view>
+          <text class="tx-amount tx-income">+¥{{ (rec.amount).toFixed(2) }}</text>
+        </view>
       </view>
     </view>
   </view>
@@ -35,6 +49,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { orgApi } from '@/subpkg-common/api';
+import api from '@/subpkg-common/api/request';
 
 interface TransactionItem {
   id: string;
@@ -46,13 +61,34 @@ interface TransactionItem {
 
 const storeInfo = ref<any>(null);
 const transactions = ref<TransactionItem[]>([]);
+const rechargeRecords = ref<any[]>([]);
 
 onMounted(async () => {
   try {
-    storeInfo.value = await orgApi.getMyStore();
+    storeInfo.value = (await orgApi.getMyStore()).data || await orgApi.getMyStore();
   } catch {}
-  // transactions use mock data — no dedicated bill API yet
-  transactions.value = generateMockTransactions();
+
+  try {
+    const financeData: any = await api.get('/finance/my-account');
+    if (financeData) {
+      storeInfo.value = { ...storeInfo.value, ...financeData };
+    }
+  } catch {}
+
+  try {
+    const txRes: any = await api.get('/finance/my-transactions', { page: 1 });
+    const items = txRes?.items || [];
+    transactions.value = items.map((t: any) => ({
+      id: t.id,
+      description: t.remark || t.transType,
+      amount: t.amount, // already in yuan from API
+      type: t.amount >= 0 ? 'income' : 'expense',
+      createdAt: t.createdAt,
+    }));
+    rechargeRecords.value = items.filter((t: any) => t.transType === 'recharge');
+  } catch {
+    // fallback: no transactions
+  }
 });
 
 const balanceYuan = computed(() => {
@@ -75,17 +111,6 @@ function goRecharge() {
 
 function goBills() {
   uni.navigateTo({ url: '/subpkg-franchisee/payment/bill-list' });
-}
-
-function generateMockTransactions(): TransactionItem[] {
-  const now = Date.now();
-  return [
-    { id: '1', description: '订单支付 - ORD20260720001', amount: 285000, type: 'expense', createdAt: new Date(now - 86400000).toISOString() },
-    { id: '2', description: '账户充值', amount: 500000, type: 'income', createdAt: new Date(now - 172800000).toISOString() },
-    { id: '3', description: '订单支付 - ORD20260718003', amount: 120000, type: 'expense', createdAt: new Date(now - 345600000).toISOString() },
-    { id: '4', description: '订单退款 - ORD20260715005', amount: 35000, type: 'income', createdAt: new Date(now - 604800000).toISOString() },
-    { id: '5', description: '订单支付 - ORD20260714002', amount: 568000, type: 'expense', createdAt: new Date(now - 864000000).toISOString() },
-  ];
 }
 </script>
 

@@ -10,6 +10,9 @@ const router = createRouter({
         { path: '/applications', name: 'Applications', component: () => import('../views/Applications.vue') },
         { path: '/finance', name: 'Finance', component: () => import('../views/Finance.vue') },
         { path: '/inventory', name: 'Inventory', component: () => import('../views/Inventory.vue') },
+        { path: '/shipments', name: 'Shipments', component: () => import('../views/Shipments.vue') },
+        { path: '/production', name: 'Production', component: () => import('../views/Production.vue') },
+        { path: '/reconciliation', name: 'Reconciliation', component: () => import('../views/Reconciliation.vue') },
     ]
 });
 export default router;
