@@ -50,6 +50,11 @@
           <td>{{ formatTime(item.createdAt) }}</td>
           <td class="actions">
             <button
+              v-if="item.trackingNo"
+              class="btn-action btn-track"
+              @click="openTrack(item)"
+            >物流</button>
+            <button
               v-if="item.status === 'pending'"
               class="btn-action btn-ship"
               @click="openShipDialog(item)"
@@ -150,6 +155,23 @@
       </div>
     </div>
 
+    <!-- Track Dialog -->
+    <div class="modal-mask" v-if="showTrack" @click.self="showTrack = false">
+      <div class="modal">
+        <h3>物流查询</h3>
+        <p class="track-info">物流查询功能预留，当前单号: {{ trackTarget?.trackingNo }}</p>
+        <div class="form-group">
+          <label>运单号</label>
+          <input v-model="trackInput" type="text" placeholder="输入运单号查询" />
+        </div>
+        <p v-if="trackQueryMsg" class="track-msg">{{ trackQueryMsg }}</p>
+        <div class="modal-actions">
+          <button class="btn-cancel" @click="showTrack = false">关闭</button>
+          <button class="btn-submit" @click="mockTrack">查询</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Detail Modal -->
     <div class="modal-mask" v-if="showDetail" @click.self="showDetail = false">
       <div class="modal modal-detail">
@@ -209,6 +231,12 @@ const shipForm = ref({ carrier: '', trackingNo: '' })
 // ── Detail State ──
 const showDetail = ref(false)
 const detailShipment = ref<any>(null)
+
+// ── Track State ──
+const showTrack = ref(false)
+const trackTarget = ref<any>(null)
+const trackInput = ref('')
+const trackQueryMsg = ref('')
 
 // ── Lifecycle ──
 onMounted(() => {
@@ -351,6 +379,19 @@ async function viewDetail(item: any) {
   }
 }
 
+// ── Track ──
+function openTrack(item: any) {
+  trackTarget.value = item
+  trackInput.value = item.trackingNo || ''
+  trackQueryMsg.value = ''
+  showTrack.value = true
+}
+
+function mockTrack() {
+  const no = trackInput.value || trackTarget.value?.trackingNo || ''
+  trackQueryMsg.value = `物流查询功能预留，当前单号: ${no}`
+}
+
 // ── Helpers ──
 function statusLabel(s: string) {
   const map: any = {
@@ -402,6 +443,7 @@ th { background: #fafafa; font-weight: 600; }
 .actions { display: flex; gap: 6px; }
 .btn-action { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-ship { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+.btn-track { background: #13c2c2; color: #fff; }
 .btn-cancel { background: #ff4d4f; color: #fff; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; }
 .btn-view { background: #f0f0f0; color: #333; }
 
@@ -433,4 +475,7 @@ th { background: #fafafa; font-weight: 600; }
 .detail-grid { margin-bottom: 16px; }
 .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 14px; }
 .detail-row span:first-child { color: #999; }
+
+.track-info { font-size: 14px; color: #667eea; margin-bottom: 16px; padding: 10px; background: #f6f7ff; border-radius: 4px; }
+.track-msg { font-size: 14px; color: #13c2c2; margin-top: 12px; padding: 8px; background: #e6fffb; border-radius: 4px; }
 </style>

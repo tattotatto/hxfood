@@ -12,6 +12,7 @@
     <div v-if="activeTab === 'accounts'">
       <div class="toolbar">
         <button class="btn-primary" @click="showRechargeDialog = true">充值</button>
+        <button class="btn-invoice" @click="applyInvoice">申请发票</button>
       </div>
 
       <div v-if="loading" class="loading">加载中...</div>
@@ -233,6 +234,10 @@ async function fetchOverdue() {
   }
 }
 
+function applyInvoice() {
+  alert('电子发票功能预留')
+}
+
 async function checkOverdue() {
   try {
     const res = await api.post('/finance/receivables/check-overdue')
@@ -253,6 +258,7 @@ h2 { font-size: 20px; margin-bottom: 16px; }
 .toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 .btn-primary { padding: 8px 16px; background: #667eea; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn-invoice { padding: 8px 16px; background: #52c41a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
 .btn-sm { padding: 4px 10px; background: #667eea; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
 .check-msg { font-size: 13px; color: #52c41a; }
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
