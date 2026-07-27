@@ -42,7 +42,12 @@ async function handleLogin() {
   error.value = ''
   try {
     await userStore.login(username.value, password.value)
-    router.push('/')
+    // Redirect based on orgType
+    if (userStore.isFranchiseStore) {
+      router.push('/no-access')
+    } else {
+      router.push(userStore.dashboardRoute)
+    }
   } catch (e: any) {
     error.value = e.response?.data?.message || '登录失败'
   } finally {
@@ -59,6 +64,6 @@ async function handleLogin() {
 .form-group label { display: block; margin-bottom: 6px; font-size: 14px; color: #333; }
 .form-group input { width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
 .error { color: #ff4d4f; font-size: 13px; margin-bottom: 12px; }
-button[type="submit"] { width: 100%; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+button[type="submit"] { width: 100%; padding: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
 button[type="submit"]:disabled { opacity: .6; cursor: not-allowed; }
 </style>
