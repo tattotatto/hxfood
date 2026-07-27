@@ -60,8 +60,8 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^@hxfood/shared-types$": "<rootDir>/../../packages/shared-types/src",
-      "^@hxfood/shared-utils$": "<rootDir>/../../packages/shared-utils/src"
+      "^@hxfood/shared-types$": "<rootDir>/../../../packages/shared-types/src",
+      "^@hxfood/shared-utils$": "<rootDir>/../../../packages/shared-utils/src"
     }
   }
 }
