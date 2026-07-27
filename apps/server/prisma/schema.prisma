@@ -186,6 +186,14 @@ enum ReceivableStatus {
   @@map("receivable_status_enum")
 }
 
+enum ReconciliationStatus {
+  pending
+  confirmed
+  disputed
+
+  @@map("reconciliation_status_enum")
+}
+
 enum FranchiseAppStatus {
   submitted
   under_review
@@ -230,6 +238,7 @@ model Brand {
   receivables           Receivable[]
   franchiseApplications FranchiseApplication[]
   shipments              Shipment[]
+  monthlyReconciliations MonthlyReconciliation[]
 
   @@map("brands")
 }
@@ -261,6 +270,7 @@ model Organization {
   accountTransactions AccountTransaction[]
   receivables         Receivable[]
   shipments           Shipment[]
+  monthlyReconciliations MonthlyReconciliation[]
 
   @@map("organizations")
 }
@@ -286,6 +296,7 @@ model User {
   reviewedApplications            FranchiseApplication[] @relation("ReviewerRel")
   paymentConfirmedApplications    FranchiseApplication[] @relation("PaymentConfirmerRel")
   shipments                       Shipment[]
+  monthlyReconciliations          MonthlyReconciliation[] @relation("ConfirmerRel")
 
   @@map("users")
 }
@@ -732,4 +743,29 @@ model FranchiseApplication {
 
   @@index([brandId, status, createdAt(sort: Desc)])
   @@map("franchise_applications")
+}
+
+model MonthlyReconciliation {
+  id              String                @id @default(uuid()) @db.Uuid
+  brandId         String                @map("brand_id") @db.Uuid
+  storeId         String                @map("store_id") @db.Uuid
+  period          String                @db.VarChar(7)
+  openingBalance  Int                   @map("opening_balance")
+  totalRecharge   Int                   @map("total_recharge") @default(0)
+  totalSpent      Int                   @map("total_spent") @default(0)
+  totalRefund     Int                   @map("total_refund") @default(0)
+  closingBalance  Int                   @map("closing_balance")
+  expectedClose   Int                   @map("expected_close")
+  hasDifference   Boolean               @default(false) @map("has_difference")
+  status          ReconciliationStatus  @default(pending)
+  confirmedBy     String?               @map("confirmed_by") @db.Uuid
+  confirmedAt     DateTime?             @map("confirmed_at") @db.Timestamptz()
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz()
+
+  brand     Brand         @relation(fields: [brandId], references: [id])
+  store     Organization  @relation(fields: [storeId], references: [id])
+  confirmer User?         @relation("ConfirmerRel", fields: [confirmedBy], references: [id])
+
+  @@unique([storeId, period])
+  @@map("monthly_reconciliations")
 }
