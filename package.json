@@ -6,7 +6,9 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "dev": "turbo run dev --parallel",
-    "format": "prettier --write \"**/*.{ts,json,md}\""
+    "format": "prettier --write \"**/*.{ts,json,md}\"",
+    "db:setup": "cd apps/server && docker-compose up -d && sleep 3 && npx prisma migrate deploy && npx prisma db seed",
+    "db:reset": "cd apps/server && docker-compose down -v && docker-compose up -d && sleep 3 && npx prisma migrate deploy && npx prisma db seed"
   },
   "devDependencies": {
     "turbo": "^2.0.0",
