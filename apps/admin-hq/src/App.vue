@@ -34,6 +34,8 @@ const menuItems = [
   { path: '/applications', label: '加盟审核', icon: '📝' },
   { path: '/finance', label: '财务管理', icon: '💰' },
   { path: '/inventory', label: '库存管理', icon: '🏭' },
+  { path: '/production', label: '生产管理', icon: '⚙️' },
+  { path: '/shipments', label: '发货管理', icon: '🚚' },
 ]
 
 function logout() {

@@ -58,6 +58,14 @@
       <view class="bottom-bar" v-if="showActions">
         <button class="btn btn-outline" v-if="canCancel" @tap="handleCancel">取消订单</button>
         <button class="btn btn-primary" v-if="canReceive" :loading="actionLoading" @tap="handleReceive">确认收货</button>
+        <button
+          class="btn btn-primary"
+          v-for="sh in shipments"
+          :key="sh.id"
+          @tap="goReceive(sh.id)"
+        >
+          确认收货({{ sh.shipmentNo }})
+        </button>
       </view>
     </template>
 
@@ -67,12 +75,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { orderApi } from '@/subpkg-common/api';
+import { orderApi, shipmentApi } from '@/subpkg-common/api';
 import type { OrderVo } from '@hxfood/shared-types';
 
 const loading = ref(true);
 const actionLoading = ref(false);
 const order = ref<OrderVo | null>(null);
+const shipments = ref<any[]>([]);
 
 onMounted(async () => {
   const pages = getCurrentPages();
@@ -88,10 +97,20 @@ onMounted(async () => {
 async function loadDetail(id: string) {
   try {
     order.value = await orderApi.detail(id);
+    await loadShipments(id);
   } catch (e: any) {
     uni.showToast({ title: e.message || '加载失败', icon: 'none' });
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadShipments(orderId: string) {
+  try {
+    const res: any = await shipmentApi.list({ orderId });
+    shipments.value = res.items || [];
+  } catch {
+    // shipments are optional
   }
 }
 
@@ -111,9 +130,9 @@ const canCancel = computed(() => {
   return s === 'pending_approval' || s === 'approved';
 });
 
-const canReceive = computed(() => order.value?.orderStatus === 'shipped');
+const canReceive = computed(() => order.value?.orderStatus === 'shipped' || order.value?.orderStatus === 'partially_shipped');
 
-const showActions = computed(() => canCancel.value || canReceive.value);
+const showActions = computed(() => canCancel.value || canReceive.value || shipments.value.length > 0);
 
 function statusText(s: string) {
   const map: any = { pending_approval: '待审核', approved: '已审核', shipped: '已发货', received: '已收货', cancelled: '已取消', draft: '草稿' };
@@ -169,6 +188,12 @@ async function handleReceive() {
   } finally {
     actionLoading.value = false;
   }
+}
+
+function goReceive(shipmentId: string) {
+  uni.navigateTo({
+    url: `/subpkg-franchisee/order/receive?id=${shipmentId}`,
+  });
 }
 </script>
 

@@ -52,6 +52,14 @@ export const brandApi = {
   getDetail: (id: string) => api.get<any>(`/products/brands/${id}`),
 };
 
+// ── Shipment ──
+export const shipmentApi = {
+  getDetail: (id: string) => api.get<any>(`/shipment/${id}`),
+  list: (params?: any) => api.get<any>('/shipment', params),
+  receive: (id: string, data: { items: { skuId: string; qty: number }[] }) =>
+    api.post<any>(`/shipment/${id}/receive`, data),
+};
+
 // ── Franchise ──
 export const franchiseApi = {
   apply: (data: any) => api.post<any>('/franchise/applications', data),
