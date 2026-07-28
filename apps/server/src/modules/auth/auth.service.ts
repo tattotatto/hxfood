@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -92,6 +97,149 @@ export class AuthService {
       orgs,
       currentOrg: orgs[0],
     };
+  }
+
+  // ── User management ──
+
+  async listUsers() {
+    const users = await this.prisma.user.findMany({
+      where: { status: 'active' },
+      include: {
+        userOrgRoles: {
+          include: {
+            org: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      username: u.username || '',
+      realName: u.realName || '',
+      phone: u.phone || '',
+      avatar: u.avatar || '',
+      status: u.status,
+      createdAt: u.createdAt,
+      orgRoles: u.userOrgRoles.map((uor) => ({
+        orgId: uor.orgId,
+        orgName: uor.org.name,
+        roleId: uor.roleId,
+        roleName: uor.role.name || uor.role.code,
+        isDefault: uor.isDefault,
+      })),
+    }));
+  }
+
+  async createUser(dto: {
+    username: string;
+    password: string;
+    realName?: string;
+    phone?: string;
+    orgId: string;
+    roleId: string;
+  }) {
+    const existing = await this.prisma.user.findFirst({
+      where: { username: dto.username },
+    });
+    if (existing) {
+      throw new BadRequestException('Username already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        username: dto.username,
+        passwordHash,
+        realName: dto.realName,
+        phone: dto.phone,
+        status: 'active',
+      },
+    });
+
+    await this.prisma.userOrgRole.create({
+      data: {
+        userId: user.id,
+        orgId: dto.orgId,
+        roleId: dto.roleId,
+        isDefault: true,
+      },
+    });
+
+    return { id: user.id, username: user.username };
+  }
+
+  async updateUser(
+    id: string,
+    dto: {
+      username?: string;
+      password?: string;
+      realName?: string;
+      phone?: string;
+      orgId?: string;
+      roleId?: string;
+    },
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const data: Record<string, any> = {};
+    if (dto.username !== undefined) data.username = dto.username;
+    if (dto.password !== undefined) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
+    }
+    if (dto.realName !== undefined) data.realName = dto.realName;
+    if (dto.phone !== undefined) data.phone = dto.phone;
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data,
+    });
+
+    if (dto.orgId && dto.roleId) {
+      const existingUor = await this.prisma.userOrgRole.findFirst({
+        where: { userId: id },
+      });
+      if (existingUor) {
+        await this.prisma.userOrgRole.update({
+          where: { id: existingUor.id },
+          data: { orgId: dto.orgId, roleId: dto.roleId },
+        });
+      } else {
+        await this.prisma.userOrgRole.create({
+          data: {
+            userId: id,
+            orgId: dto.orgId,
+            roleId: dto.roleId,
+            isDefault: true,
+          },
+        });
+      }
+    }
+
+    return { id: updated.id, username: updated.username };
+  }
+
+  async deactivateUser(id: string, operatorId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (user.id === operatorId) {
+      throw new BadRequestException('Cannot deactivate yourself');
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { status: 'disabled' },
+    });
+
+    return { id, status: 'disabled' };
   }
 
   private async generateTokens(

@@ -182,6 +182,52 @@ export class ProductService {
     });
   }
 
+  // ── 品牌设置 ──
+
+  async getBrandSettings(brandId: string) {
+    const brand = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+    });
+    if (!brand) throw new NotFoundException('Brand not found');
+    return {
+      id: brand.id,
+      name: brand.name,
+      code: brand.code,
+      status: brand.status,
+      config: brand.config || {},
+      createdAt: brand.createdAt,
+      updatedAt: brand.updatedAt,
+    };
+  }
+
+  async updateBrandSettings(
+    brandId: string,
+    dto: { name?: string; config?: Record<string, any> },
+  ) {
+    const brand = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+    });
+    if (!brand) throw new NotFoundException('Brand not found');
+
+    const data: Record<string, any> = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.config !== undefined) data.config = dto.config;
+
+    const updated = await this.prisma.brand.update({
+      where: { id: brandId },
+      data,
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      code: updated.code,
+      status: updated.status,
+      config: updated.config || {},
+      updatedAt: updated.updatedAt,
+    };
+  }
+
   // ── 品牌公开接口 ──
   async getBrands() {
     const brands = await this.prisma.brand.findMany({
