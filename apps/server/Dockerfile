@@ -39,8 +39,8 @@ RUN pnpm --filter @hxfood/server build
 FROM node:20-alpine AS prod
 WORKDIR /app
 
-# Prisma 5 engine requires OpenSSL 1.1 — Alpine 3.20+ dropped it, pull from v3.18 repo
-RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/v3.18/main openssl1.1-compat
+# Prisma 5.22 engine for musl + OpenSSL 3 (via binaryTargets in schema.prisma)
+RUN apk add --no-cache openssl
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
