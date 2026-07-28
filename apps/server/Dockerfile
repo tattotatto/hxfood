@@ -42,12 +42,10 @@ WORKDIR /app
 # Prisma 5.22 engine for musl + OpenSSL 3 (via binaryTargets in schema.prisma)
 RUN apk add --no-cache openssl
 
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm add -g tsx
 
 # Copy workspace root config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-
-# Copy package.json files with patched entry points from build stage
 COPY --from=build /app/apps/server/package.json ./apps/server/
 COPY --from=build /app/packages/shared-types/package.json ./packages/shared-types/
 COPY --from=build /app/packages/shared-utils/package.json ./packages/shared-utils/
