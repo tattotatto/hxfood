@@ -35,12 +35,9 @@ RUN node -e "const p=require('./packages/shared-utils/package.json');p.main='./d
 # Build the NestJS server
 RUN pnpm --filter @hxfood/server build
 
-# Stage 2: Production
-FROM node:20-alpine AS prod
+# Stage 2: Production — Debian for Prisma engine libssl compatibility
+FROM node:20-slim AS prod
 WORKDIR /app
-
-# Prisma 5 engine requires OpenSSL 1.1 (Alpine 3.20+ ships OpenSSL 3)
-RUN apk add --no-cache openssl1.1-compat
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
