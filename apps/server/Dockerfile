@@ -14,8 +14,8 @@ COPY packages/shared-utils/package.json packages/shared-utils/tsconfig.json pack
 COPY packages/shared-config/package.json packages/shared-config/
 COPY apps/admin-hq/package.json apps/admin-hq/
 
-# Install all dependencies (dev + prod) for build
-RUN pnpm install --frozen-lockfile
+# Install all dependencies (dev + prod) — only server + admin-hq + shared packages
+RUN pnpm install --filter @hxfood/server --filter @hxfood/admin-hq --filter @hxfood/shared-types --filter @hxfood/shared-utils --no-frozen-lockfile
 
 # Copy source code
 COPY apps/server/src/ apps/server/src/
@@ -58,7 +58,7 @@ COPY --from=build /app/packages/shared-types/package.json ./packages/shared-type
 COPY --from=build /app/packages/shared-utils/package.json ./packages/shared-utils/
 
 # Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --filter @hxfood/server --filter @hxfood/shared-types --filter @hxfood/shared-utils --prod --no-frozen-lockfile
 
 # Copy compiled output from build stage
 COPY --from=build /app/apps/server/dist/ ./apps/server/dist/
