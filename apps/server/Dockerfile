@@ -38,8 +38,8 @@ RUN node -e "const p=require('./packages/shared-utils/package.json');p.main='./d
 # Build the NestJS server
 RUN pnpm --filter @hxfood/server build
 
-# Build admin-hq SPA
-RUN pnpm --filter @hxfood/admin-hq build
+# Build admin-hq SPA (skip vue-tsc, run vite directly)
+RUN cd apps/admin-hq && npx vite build
 
 # Stage 2: Production
 FROM node:20-alpine AS prod
