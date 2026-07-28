@@ -12,6 +12,7 @@ COPY apps/server/package.json apps/server/tsconfig.json apps/server/nest-cli.jso
 COPY packages/shared-types/package.json packages/shared-types/tsconfig.json packages/shared-types/
 COPY packages/shared-utils/package.json packages/shared-utils/tsconfig.json packages/shared-utils/
 COPY packages/shared-config/package.json packages/shared-config/
+COPY apps/admin-hq/package.json apps/admin-hq/
 
 # Install all dependencies (dev + prod) for build
 RUN pnpm install --frozen-lockfile
@@ -22,6 +23,8 @@ COPY apps/server/prisma/ apps/server/prisma/
 COPY packages/shared-types/src/ packages/shared-types/src/
 COPY packages/shared-utils/src/ packages/shared-utils/src/
 COPY packages/shared-config/ packages/shared-config/
+COPY apps/admin-hq/src/ apps/admin-hq/src/
+COPY apps/admin-hq/index.html apps/admin-hq/vite.config.ts apps/admin-hq/tsconfig.json apps/admin-hq/tailwind.config.js apps/admin-hq/postcss.config.js apps/admin-hq/
 
 # Build workspace packages (compile TypeScript to JavaScript)
 RUN pnpm --filter @hxfood/shared-types build
@@ -34,6 +37,9 @@ RUN node -e "const p=require('./packages/shared-utils/package.json');p.main='./d
 
 # Build the NestJS server
 RUN pnpm --filter @hxfood/server build
+
+# Build admin-hq SPA
+RUN pnpm --filter @hxfood/admin-hq build
 
 # Stage 2: Production
 FROM node:20-alpine AS prod
@@ -59,6 +65,7 @@ COPY --from=build /app/apps/server/dist/ ./apps/server/dist/
 COPY --from=build /app/apps/server/prisma/ ./apps/server/prisma/
 COPY --from=build /app/packages/shared-types/dist/ ./packages/shared-types/dist/
 COPY --from=build /app/packages/shared-utils/dist/ ./packages/shared-utils/dist/
+COPY --from=build /app/apps/admin-hq/dist/ ./apps/admin-hq/
 
 WORKDIR /app/apps/server
 EXPOSE 3000
