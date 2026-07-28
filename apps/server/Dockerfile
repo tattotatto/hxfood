@@ -62,4 +62,5 @@ WORKDIR /app/apps/server
 EXPOSE 3000
 
 # Generate Prisma client at runtime then start the server
-CMD ["sh", "-c", "npx prisma generate && node dist/main.js"]
+# Pin Prisma CLI to v5.x — v7 drops url = env("DATABASE_URL") support
+CMD ["sh", "-c", "npx prisma@5 generate && node dist/main.js"]
