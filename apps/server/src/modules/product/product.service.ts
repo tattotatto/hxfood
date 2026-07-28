@@ -22,10 +22,11 @@ export class ProductService {
     // path 是 Unsupported("ltree")，Prisma 不生成类型，需通过 raw SQL 读写
     let path: string;
     if (dto.parentId) {
-      const rows = await this.prisma.$queryRawUnsafe<Array<{ path: string }>>(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = await (this.prisma as any).$queryRawUnsafe(
         `SELECT "path"::text as "path" FROM categories WHERE id = $1`,
         dto.parentId,
-      );
+      ) as Array<{ path: string }>;
       path = rows[0]?.path ? rows[0].path + '.' + dto.name : dto.name;
     } else {
       path = dto.name;

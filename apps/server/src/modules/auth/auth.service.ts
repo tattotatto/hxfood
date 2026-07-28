@@ -121,12 +121,12 @@ export class AuthService {
     }
     const defaultOrg =
       activeOrgs.find((u) => u.isDefault) || activeOrgs[0];
-    const brands = [...new Set(activeOrgs.map((u) => u.org.brandId))];
-    const roles = activeOrgs.map((u) => u.role.code);
-    const permissions = [
+    const brands: string[] = [...new Set(activeOrgs.map((u: any) => u.org.brandId))];
+    const roles: string[] = activeOrgs.map((u: any) => u.role.code);
+    const permissions: string[] = [
       ...new Set(
-        activeOrgs.flatMap((u) =>
-          u.role.rolePermissions.map((rp) => rp.permission.code),
+        activeOrgs.flatMap((u: any) =>
+          u.role.rolePermissions.map((rp: any) => rp.permission.code),
         ),
       ),
     ];
