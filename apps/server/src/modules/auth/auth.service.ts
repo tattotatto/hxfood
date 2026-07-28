@@ -121,15 +121,15 @@ export class AuthService {
     }
     const defaultOrg =
       activeOrgs.find((u) => u.isDefault) || activeOrgs[0];
-    const brands: string[] = [...new Set(activeOrgs.map((u: any) => u.org.brandId))];
-    const roles: string[] = activeOrgs.map((u: any) => u.role.code);
-    const permissions: string[] = [
+    const brands: string[] = [...new Set(activeOrgs.map((u: any) => u.org.brandId))] as string[];
+    const roles: string[] = activeOrgs.map((u: any) => u.role.code) as string[];
+    const permissions: string[] = ([
       ...new Set(
         activeOrgs.flatMap((u: any) =>
           u.role.rolePermissions.map((rp: any) => rp.permission.code),
         ),
       ),
-    ];
+    ]) as string[];
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const payload: JwtPayload = {
       sub: userId,
