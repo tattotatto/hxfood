@@ -65,7 +65,7 @@ COPY --from=build /app/apps/server/dist/ ./apps/server/dist/
 COPY --from=build /app/apps/server/prisma/ ./apps/server/prisma/
 COPY --from=build /app/packages/shared-types/dist/ ./packages/shared-types/dist/
 COPY --from=build /app/packages/shared-utils/dist/ ./packages/shared-utils/dist/
-COPY --from=build /app/apps/admin-hq/dist/ ./apps/admin-hq/
+COPY --from=build /app/apps/admin-hq/dist/ ./apps/server/admin-hq/
 
 WORKDIR /app/apps/server
 EXPOSE 3000
